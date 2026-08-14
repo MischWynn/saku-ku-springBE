@@ -39,11 +39,14 @@ public class UserEntity {
     @Column(name = "status", nullable = false, length = 20)
     private String status;
 
-    @Column(name = "reset_token", length = 255)
-    private String resetToken;
+    @Column(name = "deleted_date")
+    private LocalDateTime deletedDate;
 
-    @Column(name = "reset_token_expiry")
-    private LocalDateTime resetTokenExpiry;
+    // @Column(name = "reset_token", length = 255)
+    // private String resetToken;
+
+    // @Column(name = "reset_token_expiry")
+    // private LocalDateTime resetTokenExpiry;
 
     @Column(name = "created_at", insertable = false, updatable = false)
     private LocalDateTime createdAt;
