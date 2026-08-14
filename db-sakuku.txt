@@ -1,0 +1,376 @@
+-- =========================================================
+-- LOAN APPLICATION MVP DATABASE
+-- PostgreSQL
+-- =========================================================
+
+-- =========================================================
+-- EXTENSION
+-- =========================================================
+
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
+
+
+-- =========================================================
+-- 1. CUSTOMER
+-- =========================================================
+
+CREATE TABLE tbl_customer (
+    id_customer UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+
+    nama_lengkap VARCHAR(150) NOT NULL,
+    nik VARCHAR(16) NOT NULL UNIQUE,
+    no_hp VARCHAR(20) NOT NULL UNIQUE,
+    email VARCHAR(150),
+
+    alamat TEXT,
+
+    plafond NUMERIC(18,2) NOT NULL DEFAULT 0,
+
+    password_hash VARCHAR(255) NOT NULL,
+
+    status VARCHAR(20) NOT NULL DEFAULT 'ACTIVE',
+
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT chk_customer_plafond
+        CHECK (plafond >= 0),
+
+    CONSTRAINT chk_customer_status
+        CHECK (status IN ('ACTIVE', 'INACTIVE', 'BLOCKED'))
+);
+
+
+-- =========================================================
+-- 2. ROLE
+-- =========================================================
+
+CREATE TABLE tbl_role (
+    id_role UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+
+    nama_role VARCHAR(50) NOT NULL UNIQUE,
+
+    description VARCHAR(255),
+
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+
+-- =========================================================
+-- 3. USER
+-- =========================================================
+
+CREATE TABLE tbl_user (
+    id_user UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+
+    id_role UUID NOT NULL,
+
+    nama_lengkap VARCHAR(150) NOT NULL,
+    username VARCHAR(100) NOT NULL UNIQUE,
+    email VARCHAR(150) NOT NULL UNIQUE,
+
+    password_hash VARCHAR(255) NOT NULL,
+
+    status VARCHAR(20) NOT NULL DEFAULT 'ACTIVE',
+
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT fk_user_role
+        FOREIGN KEY (id_role)
+        REFERENCES tbl_role(id_role),
+
+    CONSTRAINT chk_user_status
+        CHECK (status IN ('ACTIVE', 'INACTIVE', 'BLOCKED'))
+);
+
+
+-- =========================================================
+-- 4. MENU
+-- =========================================================
+
+CREATE TABLE tbl_menu (
+    id_menu UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+
+    nama_menu VARCHAR(100) NOT NULL,
+    path VARCHAR(255),
+
+    icon VARCHAR(100),
+
+    parent_id UUID,
+
+    urutan INTEGER DEFAULT 0,
+
+    status VARCHAR(20) NOT NULL DEFAULT 'ACTIVE',
+
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT fk_menu_parent
+        FOREIGN KEY (parent_id)
+        REFERENCES tbl_menu(id_menu),
+
+    CONSTRAINT chk_menu_status
+        CHECK (status IN ('ACTIVE', 'INACTIVE'))
+);
+
+
+-- =========================================================
+-- 5. ROLE MENU
+-- =========================================================
+
+CREATE TABLE tbl_role_menu (
+    id_role_menu UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+
+    id_role UUID NOT NULL,
+    id_menu UUID NOT NULL,
+
+    can_view BOOLEAN NOT NULL DEFAULT FALSE,
+    can_create BOOLEAN NOT NULL DEFAULT FALSE,
+    can_update BOOLEAN NOT NULL DEFAULT FALSE,
+    can_delete BOOLEAN NOT NULL DEFAULT FALSE,
+
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT fk_role_menu_role
+        FOREIGN KEY (id_role)
+        REFERENCES tbl_role(id_role)
+        ON DELETE CASCADE,
+
+    CONSTRAINT fk_role_menu_menu
+        FOREIGN KEY (id_menu)
+        REFERENCES tbl_menu(id_menu)
+        ON DELETE CASCADE,
+
+    CONSTRAINT uq_role_menu
+        UNIQUE (id_role, id_menu)
+);
+
+
+-- =========================================================
+-- 6. BUNGA / TENOR
+-- =========================================================
+
+CREATE TABLE tbl_bunga_tenor (
+    id_bunga_tenor UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+
+    tenor INTEGER NOT NULL,
+
+    interest_rate NUMERIC(7,4) NOT NULL,
+
+    status VARCHAR(20) NOT NULL DEFAULT 'ACTIVE',
+
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT chk_tenor
+        CHECK (tenor > 0),
+
+    CONSTRAINT chk_interest_rate
+        CHECK (interest_rate >= 0),
+
+    CONSTRAINT chk_bunga_status
+        CHECK (status IN ('ACTIVE', 'INACTIVE')),
+
+    CONSTRAINT uq_bunga_tenor
+        UNIQUE (tenor)
+);
+
+
+-- =========================================================
+-- 7. PENGAJUAN
+-- =========================================================
+
+CREATE TABLE tbl_pengajuan (
+    id_pengajuan UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+
+    id_customer UUID NOT NULL,
+
+    id_bunga_tenor UUID NOT NULL,
+
+    nominal_pengajuan NUMERIC(18,2) NOT NULL,
+
+    -- Snapshot of selected tenor/rate
+    tenor INTEGER NOT NULL,
+    interest_rate NUMERIC(7,4) NOT NULL,
+
+    -- Filled when BM approves
+    nominal_disetujui NUMERIC(18,2),
+
+    status VARCHAR(30) NOT NULL DEFAULT 'SUBMITTED',
+
+    tanggal_pengajuan TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT fk_pengajuan_customer
+        FOREIGN KEY (id_customer)
+        REFERENCES tbl_customer(id_customer),
+
+    CONSTRAINT fk_pengajuan_bunga_tenor
+        FOREIGN KEY (id_bunga_tenor)
+        REFERENCES tbl_bunga_tenor(id_bunga_tenor),
+
+    CONSTRAINT chk_nominal_pengajuan
+        CHECK (nominal_pengajuan > 0),
+
+    CONSTRAINT chk_nominal_disetujui
+        CHECK (
+            nominal_disetujui IS NULL
+            OR nominal_disetujui > 0
+        ),
+
+    CONSTRAINT chk_approved_not_greater
+        CHECK (
+            nominal_disetujui IS NULL
+            OR nominal_disetujui <= nominal_pengajuan
+        ),
+
+    CONSTRAINT chk_pengajuan_status
+        CHECK (
+            status IN (
+                'SUBMITTED',
+
+                'MARKETING_REVIEW',
+                'MARKETING_APPROVED',
+                'MARKETING_REJECTED',
+
+                'BM_REVIEW',
+                'BM_APPROVED',
+                'BM_REJECTED',
+
+                'BACKOFFICE_REVIEW',
+                'DISBURSED',
+
+                'CANCELLED'
+            )
+        )
+);
+
+
+-- =========================================================
+-- 8. REVIEW LOG
+-- =========================================================
+
+CREATE TABLE tbl_review_log (
+    id_review_log UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+
+    id_pengajuan UUID NOT NULL,
+
+    id_user UUID NOT NULL,
+
+    role_name VARCHAR(50) NOT NULL,
+
+    action VARCHAR(30) NOT NULL,
+
+    status_from VARCHAR(30),
+    status_to VARCHAR(30),
+
+    catatan TEXT,
+
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT fk_review_pengajuan
+        FOREIGN KEY (id_pengajuan)
+        REFERENCES tbl_pengajuan(id_pengajuan)
+        ON DELETE CASCADE,
+
+    CONSTRAINT fk_review_user
+        FOREIGN KEY (id_user)
+        REFERENCES tbl_user(id_user),
+
+    CONSTRAINT chk_review_action
+        CHECK (
+            action IN (
+                'SUBMIT',
+                'APPROVE',
+                'REJECT',
+                'REVIEW',
+                'DISBURSE',
+                'CANCEL'
+            )
+        )
+);
+
+
+-- =========================================================
+-- 9. NOTIFICATION
+-- =========================================================
+
+CREATE TABLE tbl_notifikasi (
+    id_notifikasi UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+
+    id_customer UUID NOT NULL,
+
+    id_pengajuan UUID,
+
+    judul VARCHAR(150) NOT NULL,
+
+    pesan TEXT NOT NULL,
+
+    is_read BOOLEAN NOT NULL DEFAULT FALSE,
+
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT fk_notifikasi_customer
+        FOREIGN KEY (id_customer)
+        REFERENCES tbl_customer(id_customer)
+        ON DELETE CASCADE,
+
+    CONSTRAINT fk_notifikasi_pengajuan
+        FOREIGN KEY (id_pengajuan)
+        REFERENCES tbl_pengajuan(id_pengajuan)
+        ON DELETE SET NULL
+);
+
+
+-- =========================================================
+-- INDEXES
+-- =========================================================
+
+CREATE INDEX idx_pengajuan_customer
+    ON tbl_pengajuan(id_customer);
+
+CREATE INDEX idx_pengajuan_status
+    ON tbl_pengajuan(status);
+
+CREATE INDEX idx_pengajuan_tanggal
+    ON tbl_pengajuan(tanggal_pengajuan);
+
+CREATE INDEX idx_review_pengajuan
+    ON tbl_review_log(id_pengajuan);
+
+CREATE INDEX idx_review_user
+    ON tbl_review_log(id_user);
+
+CREATE INDEX idx_review_created
+    ON tbl_review_log(created_at);
+
+CREATE INDEX idx_notifikasi_customer
+    ON tbl_notifikasi(id_customer);
+
+CREATE INDEX idx_notifikasi_unread
+    ON tbl_notifikasi(id_customer, is_read);
+
+
+-- =========================================================
+-- INITIAL ROLES
+-- =========================================================
+
+INSERT INTO tbl_role (nama_role, description)
+VALUES
+    ('MARKETING', 'Marketing officer yang melakukan review pengajuan'),
+    ('BM', 'Branch Manager yang melakukan approval'),
+    ('BACK_OFFICE', 'Back Office yang melakukan proses pencairan');
+
+
+-- =========================================================
+-- INITIAL BUNGA / TENOR
+-- =========================================================
+
+INSERT INTO tbl_bunga_tenor (tenor, interest_rate)
+VALUES
+    (6, 5.0000),
+    (12, 8.0000),
+    (18, 10.0000),
+    (24, 12.0000);
