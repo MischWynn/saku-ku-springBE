@@ -8,6 +8,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Optional;
 
@@ -19,11 +20,13 @@ public class AppUserDetailsService implements UserDetailsService {
 
     @NonNull
     @Override
+    @Transactional(readOnly = true)
     public AppUserEntity loadUserByUsername(@NonNull String identifier) {
         return findUser(identifier)
                 .orElseThrow(() -> new UsernameNotFoundException("User " + identifier + " tidak ditemukan"));
     }
-
+    
+    @Transactional(readOnly = true)
     public Optional<AppUserEntity> findUser(String identifier) {
         Optional<UserEntity> found = userRepository.findByEmail(identifier);
         if (found.isEmpty()) {

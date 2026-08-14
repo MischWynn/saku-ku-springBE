@@ -8,10 +8,13 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import com.binar.bc.saku_ku.dto.ForgotPasswordRequest;
+import com.binar.bc.saku_ku.dto.RegisterRequest;
 import com.binar.bc.saku_ku.dto.ResetPasswordRequest;
+import com.binar.bc.saku_ku.entity.RoleEntity;
 import com.binar.bc.saku_ku.entity.UserEntity;
 import com.binar.bc.saku_ku.exception.BusinessRuleException;
 import com.binar.bc.saku_ku.exception.UnauthorizedException;
+import com.binar.bc.saku_ku.repository.RoleRepository;
 import com.binar.bc.saku_ku.repository.UserRepository;
 
 import io.jsonwebtoken.Claims;
@@ -23,6 +26,7 @@ public class UserManagementService {
         
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
+    private final RoleRepository roleRepository;
     private final JwtService jwtService;
 
     public String requestForgotPassword(ForgotPasswordRequest request) {
@@ -46,6 +50,21 @@ public class UserManagementService {
         user.setPasswordHash(passwordEncoder.encode(request.getNewPassword()));
         userRepository.save(user); // save di sini cuma buat update password, bukan buat simpan token
     }   
+
+    public UserEntity createUser(RegisterRequest request) {
+        RoleEntity role = roleRepository.findByNamaRole(request.getRoleName())
+                .orElseThrow(() -> new BusinessRuleException("Role not found"));
+
+        UserEntity user = new UserEntity();
+        user.setNamaLengkap(request.getNamaLengkap());
+        user.setUsername(request.getUsername());
+        user.setEmail(request.getEmail());
+        user.setPasswordHash(passwordEncoder.encode(request.getPassword()));
+        user.setStatus("ACTIVE");
+        user.setRole(role);
+
+        return userRepository.save(user);
+    }
 } 
 
     // public String requestForgotPassword(ForgotPasswordRequest forgotPasswordRequest) {
