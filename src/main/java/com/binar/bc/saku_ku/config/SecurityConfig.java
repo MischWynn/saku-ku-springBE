@@ -48,6 +48,8 @@ public class SecurityConfig {
                         .requestMatchers("/api/v1/auth/**").permitAll()
                         // .requestMatchers("/api/v1/dashboard/**").hasRole("SUPERADMIN")
                         .requestMatchers(org.springframework.http.HttpMethod.POST, "/api/v1/user").hasRole("SUPERADMIN")
+                        .requestMatchers(org.springframework.http.HttpMethod.PATCH, "/api/v1/user/{id}").hasRole("SUPERADMIN")
+                        .requestMatchers(org.springframework.http.HttpMethod.PATCH, "/api/v1/user/me").hasAnyRole("SUPERADMIN", "MARKETING", "BM", "BACK_OFFICE")
                         .requestMatchers("/api/v1/user/login").permitAll()
                         .requestMatchers("/api/v1/user/forgot-password").permitAll()
                         .requestMatchers("/api/v1/user/reset-password").permitAll()

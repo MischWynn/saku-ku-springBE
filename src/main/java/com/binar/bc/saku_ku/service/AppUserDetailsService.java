@@ -28,9 +28,9 @@ public class AppUserDetailsService implements UserDetailsService {
     
     @Transactional(readOnly = true)
     public Optional<AppUserEntity> findUser(String identifier) {
-        Optional<UserEntity> found = userRepository.findByEmail(identifier);
+        Optional<UserEntity> found = userRepository.findByEmailAndDeletedDateIsNull(identifier);
         if (found.isEmpty()) {
-            found = userRepository.findByUsername(identifier);
+            found = userRepository.findByUsernameAndDeletedDateIsNull(identifier);
         }
         return found.map(this::toAppUser);
     }
@@ -43,4 +43,6 @@ public class AppUserDetailsService implements UserDetailsService {
         appUser.setRole(user.getRole().getNamaRole());
         return appUser;
     }
+
+    
 }
