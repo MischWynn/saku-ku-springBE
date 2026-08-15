@@ -49,6 +49,8 @@ public class SecurityConfig {
                         .requestMatchers("/api/v1/user/login").permitAll()
                         .requestMatchers("/api/v1/user/forgot-password").permitAll()
                         .requestMatchers("/api/v1/user/reset-password").permitAll()
+                        .requestMatchers("/api/v1/customer/register").permitAll()
+                        .requestMatchers("/api/v1/customer/login").permitAll()
 
                         // rule spesifik /me HARUS di atas rule wildcard {id}
                         .requestMatchers(org.springframework.http.HttpMethod.PATCH, "/api/v1/user/me")

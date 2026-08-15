@@ -35,7 +35,7 @@ public class AuthService {
         }
 
         AppUserEntity user = found.get();
-        String token = jwtService.issue(user, Instant.now());
+        String token = jwtService.issue(user.getUsername(), user.getRole(), Instant.now());
         return ResponseEntity.ok(new AuthResponseDTO(token));
     }
 

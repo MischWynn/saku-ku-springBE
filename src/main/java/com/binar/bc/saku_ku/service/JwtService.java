@@ -1,6 +1,5 @@
 package com.binar.bc.saku_ku.service;
 
-import com.binar.bc.saku_ku.entity.AppUserEntity;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.JwtBuilder;
 import io.jsonwebtoken.JwtException;
@@ -29,14 +28,15 @@ public class JwtService {
         this.ttl = Duration.ofMinutes(ttlMinutes);
     }
 
-    public String issue(AppUserEntity user, Instant issuedAt) {
-        return builder(user, issuedAt)
+    // Sekarang generic: nerima username + role langsung, bukan AppUserEntity
+    public String issue(String username, String role, Instant issuedAt) {
+        return builder(username, role, issuedAt)
                 .expiration(Date.from(issuedAt.plus(ttl)))
                 .compact();
     }
 
-    public String issueWithoutExpiry(AppUserEntity user, Instant issuedAt) {
-        return builder(user, issuedAt).compact();
+    public String issueWithoutExpiry(String username, String role, Instant issuedAt) {
+        return builder(username, role, issuedAt).compact();
     }
 
     public Claims parse(String token) {
@@ -47,10 +47,10 @@ public class JwtService {
                 .getPayload();
     }
 
-    private JwtBuilder builder(AppUserEntity user, Instant issuedAt) {
+    private JwtBuilder builder(String username, String role, Instant issuedAt) {
         return Jwts.builder()
-                .subject(user.getUsername())
-                .claim("role", user.getRole())
+                .subject(username)
+                .claim("role", role)
                 .issuedAt(Date.from(issuedAt))
                 .signWith(key);
     }
