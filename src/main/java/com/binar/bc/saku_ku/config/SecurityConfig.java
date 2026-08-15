@@ -46,16 +46,23 @@ public class SecurityConfig {
                         .frameOptions(frameOptionsConfig -> frameOptionsConfig.deny()))
                 .authorizeHttpRequests(request -> request
                         .requestMatchers("/api/v1/auth/**").permitAll()
-                        // .requestMatchers("/api/v1/dashboard/**").hasRole("SUPERADMIN")
-                        .requestMatchers(org.springframework.http.HttpMethod.POST, "/api/v1/user").hasRole("SUPERADMIN")
-                        .requestMatchers(org.springframework.http.HttpMethod.PATCH, "/api/v1/user/{id}").hasRole("SUPERADMIN")
-                        .requestMatchers(org.springframework.http.HttpMethod.PATCH, "/api/v1/user/me").hasAnyRole("SUPERADMIN", "MARKETING", "BM", "BACK_OFFICE")
                         .requestMatchers("/api/v1/user/login").permitAll()
                         .requestMatchers("/api/v1/user/forgot-password").permitAll()
                         .requestMatchers("/api/v1/user/reset-password").permitAll()
+
+                        // rule spesifik /me HARUS di atas rule wildcard {id}
+                        .requestMatchers(org.springframework.http.HttpMethod.PATCH, "/api/v1/user/me")
+                                .hasAnyRole("SUPERADMIN", "MARKETING", "BM", "BACK_OFFICE")
+                        .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/user/me")
+                                .hasAnyRole("SUPERADMIN", "MARKETING", "BM", "BACK_OFFICE")
+
+                        // baru rule wildcard {id}, taruh di bawah
+                        .requestMatchers(org.springframework.http.HttpMethod.POST, "/api/v1/user").hasRole("SUPERADMIN")
+                        .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/user").hasRole("SUPERADMIN")
+                        .requestMatchers(org.springframework.http.HttpMethod.PATCH, "/api/v1/user/{id}").hasRole("SUPERADMIN")
+
                         .anyRequest().authenticated()
-                    )
-                              .exceptionHandling(handling -> handling
+                )                              .exceptionHandling(handling -> handling
                         .authenticationEntryPoint((request, response, authException) -> {
                             response.setStatus(HttpStatus.UNAUTHORIZED.value());
                             response.setContentType(MediaType.APPLICATION_JSON_VALUE);
