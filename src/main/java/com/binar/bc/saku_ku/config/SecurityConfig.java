@@ -58,6 +58,16 @@ public class SecurityConfig {
                         .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/user/me")
                                 .hasAnyRole("SUPERADMIN", "MARKETING", "BM", "BACK_OFFICE")
 
+                        //rule spesifik untuk /tenor 
+                        .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/bunga-tenor/**")
+                                .hasAnyRole("SUPERADMIN", "MARKETING")
+                        .requestMatchers(org.springframework.http.HttpMethod.POST, "/api/v1/bunga-tenor")
+                                .hasRole("SUPERADMIN")
+                        .requestMatchers(org.springframework.http.HttpMethod.PATCH, "/api/v1/bunga-tenor/{id}")
+                                .hasRole("SUPERADMIN")
+                        .requestMatchers(org.springframework.http.HttpMethod.DELETE, "/api/v1/bunga-tenor/{id}")
+                                .hasRole("SUPERADMIN")
+
                         // baru rule wildcard {id}, taruh di bawah
                         .requestMatchers(org.springframework.http.HttpMethod.POST, "/api/v1/user").hasRole("SUPERADMIN")
                         .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/user").hasRole("SUPERADMIN")
@@ -76,6 +86,17 @@ public class SecurityConfig {
                                     "message", "Akses ditolak, Anda tidak terautentikasi"
                             );
                             response.getWriter().write(objectMapper.writeValueAsString(body));
+                        })
+                                             .accessDeniedHandler((request, response, accessDeniedException) -> {
+                        response.setStatus(HttpStatus.FORBIDDEN.value());
+                        response.setContentType(MediaType.APPLICATION_JSON_VALUE);
+                        Map<String, Object> body = Map.of(
+                                "timestamp", Instant.now().toString(),
+                                "status", HttpStatus.FORBIDDEN.value(),
+                                "error", HttpStatus.FORBIDDEN.getReasonPhrase(),
+                                "message", "Akses ditolak, Anda tidak memiliki hak akses"
+                        );
+                        response.getWriter().write(objectMapper.writeValueAsString(body));
                         })
                 )
                 .formLogin(form -> form.disable())

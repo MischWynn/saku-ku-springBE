@@ -9,10 +9,10 @@ import lombok.Setter;
 @Setter
 public class CustomerLoginRequest {
 
-    @NotBlank(message = "Email/No HP tidak boleh kosong")
+    @NotBlank(message = "Email/No HP cannot be empty")
     @JsonAlias({"email", "noHp"})
     private String identifier;
 
-    @NotBlank(message = "Password tidak boleh kosong")
+    @NotBlank(message = "Password cannot be empty")
     private String password;
 }

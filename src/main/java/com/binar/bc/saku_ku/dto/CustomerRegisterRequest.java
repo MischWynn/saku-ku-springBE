@@ -10,22 +10,22 @@ import lombok.Setter;
 @Setter
 public class CustomerRegisterRequest {
 
-    @NotBlank(message = "Nama lengkap tidak boleh kosong")
+    @NotBlank(message = "Full name cannot be empty")
     private String namaLengkap;
 
-    @NotBlank(message = "NIK tidak boleh kosong")
-    @Pattern(regexp = "\\d{16}", message = "NIK harus 16 digit angka")
+    @NotBlank(message = "NIK cannot be empty")
+    @Pattern(regexp = "\\d{16}", message = "NIK must be 16 digits")
     private String nik;
 
-    @NotBlank(message = "Nomor HP tidak boleh kosong")
+    @NotBlank(message = "Phone Number cannot be empty")
     private String noHp;
 
-    @NotBlank(message = "Email tidak boleh kosong")
-    @Email(message = "Format email tidak valid")
+    @NotBlank(message = "Email cannot be empty")
+    @Email(message = "Invalid email format")
     private String email;
 
     private String alamat;
 
-    @NotBlank(message = "Password tidak boleh kosong")
+    @NotBlank(message = "Password cannot be empty")
     private String password;
 }
