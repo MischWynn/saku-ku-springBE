@@ -1,29 +1,73 @@
 package com.binar.bc.saku_ku.controller;
 
-import org.springframework.web.bind.annotation.PatchMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
-
 import com.binar.bc.saku_ku.dto.ApiResponse;
 import com.binar.bc.saku_ku.dto.UpdateProfileRequest;
+import com.binar.bc.saku_ku.dto.UpdateUserRequest;
 import com.binar.bc.saku_ku.entity.AppUserEntity;
 import com.binar.bc.saku_ku.entity.UserEntity;
 import com.binar.bc.saku_ku.service.UserService;
-
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.UUID;
+import java.util.List;
 
 @RequiredArgsConstructor
+@RequestMapping("/api/v1/user")
+@RestController
 public class UserController {
 
     private final UserService userService;
 
+    //PATCH UPDATE /api/v1/user/me
     @PatchMapping("/me")
     public ApiResponse<UserEntity> updateOwnProfile(
         @AuthenticationPrincipal AppUserEntity currentUser,
         @RequestBody UpdateProfileRequest request
 ) {
-    String currentUsername = currentUser.getUsername();
-    UserEntity user = userService.updateOwnProfile(currentUsername, request.getNamaLengkap(), request.getEmail());
-    return ApiResponse.success(user, "Profile updated successfully");
-}
+        UserEntity user = userService.updateOwnProfile(
+                currentUser.getUsername(), request.getNamaLengkap(), request.getEmail());
+        return ApiResponse.success(user, "Profile updated successfully");
+    }
+   
+    //PATCH /api/v1/user/{id}
+    @PatchMapping("/{id}")
+    public ApiResponse<UserEntity> updateUserBySuperadmin(
+        @PathVariable UUID id, 
+        @RequestBody UpdateUserRequest request
+    ) {
+        UserEntity user = userService.updateUserBySuperadmin(
+                id, request.getNamaLengkap(), request.getEmail(), request.getStatus(), request.getRoleName());
+        return ApiResponse.success(user, "User updated successfully");
+    }
+    
+    //DELETE /api/v1/user/{id}
+    @DeleteMapping("/{id}")
+    public ApiResponse<String> deleteUserById(@PathVariable("id") UUID id)
+    {
+        userService.deleteUserById(id);
+        return ApiResponse.success(null, "User deleted successfully");
+    }
+
+    //GET /api/v1/user/me
+    @GetMapping("/me")
+    public ApiResponse<UserEntity> getCurrentUser(@AuthenticationPrincipal AppUserEntity currentUser) {
+        UserEntity user = userService.getUserByUsername(currentUser.getUsername());
+        return ApiResponse.success(user, "Current user retrieved successfully");
+    }
+
+    //GET /api/v1/user/{id}
+    @GetMapping("/{id}")
+    public ApiResponse<UserEntity> getUserById(@PathVariable UUID id) {
+        UserEntity user = userService.getUserById(id);
+        return ApiResponse.success(user, "User retrieved successfully");
+        
+    }
+    //Get All Users
+    @GetMapping
+    public ApiResponse<List<UserEntity>> getAllUsers() {
+        List<UserEntity> users = userService.getAllUsers();
+        return ApiResponse.success(users, "Users retrieved successfully");
+    }
 }

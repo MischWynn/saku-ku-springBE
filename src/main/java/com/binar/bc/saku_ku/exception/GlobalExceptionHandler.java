@@ -16,7 +16,7 @@ import jakarta.persistence.EntityNotFoundException;
 @RestControllerAdvice
 public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     
-    public static final String REQUIRED_AUTHENTICATION_MESSAGE = "Unauthoriezed access: Authentication required";
+    public static final String REQUIRED_AUTHENTICATION_MESSAGE = "Unauthorized access: Authentication required";
 
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<Map<String, Object>> illegalArgument 

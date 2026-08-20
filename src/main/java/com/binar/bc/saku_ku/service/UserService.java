@@ -57,11 +57,12 @@ public class UserService {
     //     userRepository.delete(user);
     // }
 
+    @Transactional
     public void deleteUserById(UUID id) {
         UserEntity user = userRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("User not found with id: " + id));
         user.setDeletedDate(LocalDateTime.now());
-        userRepository.delete(user);
+        userRepository.save(user);
     }
 
     @Transactional

@@ -9,12 +9,12 @@ import lombok.Setter;
 @Getter
 public class ResetPasswordRequest {
 
-    @NotBlank(message = "Email tidak boleh kosong")
+    @NotBlank(message = "Email can't be empty")
     private String email;
 
     private String token;
 
-    @NotBlank(message = "Password baru tidak boleh kosong")
-    @Size(min = 8, message = "Password baru harus memiliki minimal 8 karakter")
+    @NotBlank(message = "New Password can't be empty")
+    @Size(min = 8, message = "New Password must have at least 8 characters")
     private String newPassword;
 }

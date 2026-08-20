@@ -46,16 +46,67 @@ public class SecurityConfig {
                         .frameOptions(frameOptionsConfig -> frameOptionsConfig.deny()))
                 .authorizeHttpRequests(request -> request
                         .requestMatchers("/api/v1/auth/**").permitAll()
-                        // .requestMatchers("/api/v1/dashboard/**").hasRole("SUPERADMIN")
-                        .requestMatchers(org.springframework.http.HttpMethod.POST, "/api/v1/user").hasRole("SUPERADMIN")
-                        .requestMatchers(org.springframework.http.HttpMethod.PATCH, "/api/v1/user/{id}").hasRole("SUPERADMIN")
-                        .requestMatchers(org.springframework.http.HttpMethod.PATCH, "/api/v1/user/me").hasAnyRole("SUPERADMIN", "MARKETING", "BM", "BACK_OFFICE")
                         .requestMatchers("/api/v1/user/login").permitAll()
                         .requestMatchers("/api/v1/user/forgot-password").permitAll()
                         .requestMatchers("/api/v1/user/reset-password").permitAll()
+                        .requestMatchers("/api/v1/customer/register").permitAll()
+                        .requestMatchers("/api/v1/customer/login").permitAll()
+
+                        // rule spesifik /me HARUS di atas rule wildcard {id}
+                        .requestMatchers(org.springframework.http.HttpMethod.PATCH, "/api/v1/user/me")
+                                .hasAnyRole("SUPERADMIN", "MARKETING", "BM", "BACK_OFFICE")
+                        .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/user/me")
+                                .hasAnyRole("SUPERADMIN", "MARKETING", "BM", "BACK_OFFICE")
+
+                        //rule spesifik untuk /tenor 
+                        .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/bunga-tenor/**")
+                                .hasAnyRole("SUPERADMIN", "MARKETING")
+                        .requestMatchers(org.springframework.http.HttpMethod.POST, "/api/v1/bunga-tenor")
+                                .hasRole("SUPERADMIN")
+                        .requestMatchers(org.springframework.http.HttpMethod.PATCH, "/api/v1/bunga-tenor/{id}")
+                                .hasRole("SUPERADMIN")
+                        .requestMatchers(org.springframework.http.HttpMethod.DELETE, "/api/v1/bunga-tenor/{id}")
+                                .hasRole("SUPERADMIN")
+
+                        // === Pengajuan: Customer ===
+                        .requestMatchers(org.springframework.http.HttpMethod.POST, "/api/v1/pengajuan")
+                                .hasRole("CUSTOMER")
+                        .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/pengajuan/me")
+                                .hasRole("CUSTOMER")
+                        .requestMatchers(org.springframework.http.HttpMethod.PATCH, "/api/v1/pengajuan/{id}/cancel")
+                                .hasRole("CUSTOMER")
+
+                        // === Pengajuan: MARKETING actions ===
+                        .requestMatchers(org.springframework.http.HttpMethod.PATCH, "/api/v1/pengajuan/{id}/marketing-approve")
+                                .hasRole("MARKETING")
+                        .requestMatchers(org.springframework.http.HttpMethod.PATCH, "/api/v1/pengajuan/{id}/marketing-reject")
+                                .hasRole("MARKETING")
+
+                        // === Pengajuan: BM actions ===
+                        .requestMatchers(org.springframework.http.HttpMethod.PATCH, "/api/v1/pengajuan/{id}/bm-approve")
+                                .hasRole("BM")
+                        .requestMatchers(org.springframework.http.HttpMethod.PATCH, "/api/v1/pengajuan/{id}/bm-reject")
+                                .hasRole("BM")
+
+                        // === Pengajuan: BACK_OFFICE action ===
+                        .requestMatchers(org.springframework.http.HttpMethod.PATCH, "/api/v1/pengajuan/{id}/disburse")
+                                .hasRole("BACK_OFFICE")
+
+                        // === Pengajuan: SUPERADMIN override ===
+                        .requestMatchers(org.springframework.http.HttpMethod.PATCH, "/api/v1/pengajuan/{id}/cancel-admin")
+                                .hasRole("SUPERADMIN")
+
+                        // === Pengajuan: staff read (semua role staff boleh liat) ===
+                        .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/pengajuan/**")
+                                .hasAnyRole("SUPERADMIN", "MARKETING", "BM", "BACK_OFFICE")
+
+                        // baru rule wildcard {id}, taruh di bawah
+                        .requestMatchers(org.springframework.http.HttpMethod.POST, "/api/v1/user").hasRole("SUPERADMIN")
+                        .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/user").hasRole("SUPERADMIN")
+                        .requestMatchers(org.springframework.http.HttpMethod.PATCH, "/api/v1/user/{id}").hasRole("SUPERADMIN")
+
                         .anyRequest().authenticated()
-                    )
-                              .exceptionHandling(handling -> handling
+                )                              .exceptionHandling(handling -> handling
                         .authenticationEntryPoint((request, response, authException) -> {
                             response.setStatus(HttpStatus.UNAUTHORIZED.value());
                             response.setContentType(MediaType.APPLICATION_JSON_VALUE);
@@ -67,6 +118,17 @@ public class SecurityConfig {
                                     "message", "Akses ditolak, Anda tidak terautentikasi"
                             );
                             response.getWriter().write(objectMapper.writeValueAsString(body));
+                        })
+                                             .accessDeniedHandler((request, response, accessDeniedException) -> {
+                        response.setStatus(HttpStatus.FORBIDDEN.value());
+                        response.setContentType(MediaType.APPLICATION_JSON_VALUE);
+                        Map<String, Object> body = Map.of(
+                                "timestamp", Instant.now().toString(),
+                                "status", HttpStatus.FORBIDDEN.value(),
+                                "error", HttpStatus.FORBIDDEN.getReasonPhrase(),
+                                "message", "Akses ditolak, Anda tidak memiliki hak akses"
+                        );
+                        response.getWriter().write(objectMapper.writeValueAsString(body));
                         })
                 )
                 .formLogin(form -> form.disable())
