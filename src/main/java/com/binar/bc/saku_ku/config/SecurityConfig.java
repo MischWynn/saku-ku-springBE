@@ -51,6 +51,8 @@ public class SecurityConfig {
                         .requestMatchers("/api/v1/user/reset-password").permitAll()
                         .requestMatchers("/api/v1/customer/register").permitAll()
                         .requestMatchers("/api/v1/customer/login").permitAll()
+                        .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/pengajuan/**")
+        .hasAnyRole("SUPERADMIN", "MARKETING", "BM", "BACK_OFFICE")
 
                         // rule spesifik /me HARUS di atas rule wildcard {id}
                         .requestMatchers(org.springframework.http.HttpMethod.PATCH, "/api/v1/user/me")
@@ -74,6 +76,10 @@ public class SecurityConfig {
                         .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/pengajuan/me")
                                 .hasRole("CUSTOMER")
                         .requestMatchers(org.springframework.http.HttpMethod.PATCH, "/api/v1/pengajuan/{id}/cancel")
+                                .hasRole("CUSTOMER")
+                        .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/notifikasi/**")
+                                .hasRole("CUSTOMER")
+                        .requestMatchers(org.springframework.http.HttpMethod.PATCH, "/api/v1/notifikasi/{id}/read")
                                 .hasRole("CUSTOMER")
 
                         // === Pengajuan: MARKETING actions ===
