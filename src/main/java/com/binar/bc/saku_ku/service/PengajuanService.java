@@ -5,10 +5,15 @@ import com.binar.bc.saku_ku.dto.PengajuanReviewRequest;
 import com.binar.bc.saku_ku.entity.BungaTenorEntity;
 import com.binar.bc.saku_ku.entity.CustomerEntity;
 import com.binar.bc.saku_ku.entity.PengajuanEntity;
+import com.binar.bc.saku_ku.entity.UserEntity;
 import com.binar.bc.saku_ku.exception.BusinessRuleException;
 import com.binar.bc.saku_ku.repository.BungaTenorRepository;
 import com.binar.bc.saku_ku.repository.CustomerRepository;
 import com.binar.bc.saku_ku.repository.PengajuanRepository;
+import com.binar.bc.saku_ku.repository.UserRepository;
+import com.binar.bc.saku_ku.service.NotificationService;
+
+
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -24,6 +29,9 @@ public class PengajuanService {
     private final PengajuanRepository pengajuanRepository;
     private final CustomerRepository customerRepository;
     private final BungaTenorRepository bungaTenorRepository;
+    private final ReviewLogService reviewLogService;
+    private final UserRepository userRepository;
+    private final NotificationService notificationService;
 
     // ==== CREATE (oleh Customer) ====
 
@@ -73,24 +81,43 @@ public class PengajuanService {
     // ==== MARKETING actions ====
 
     @Transactional
-    public PengajuanEntity marketingApprove(UUID id, PengajuanReviewRequest request) {
+    public PengajuanEntity marketingApprove(UUID id, String currentUsername, PengajuanReviewRequest request) {
         PengajuanEntity pengajuan = requireStatus(id, "MARKETING_REVIEW");
-        pengajuan.setStatus("BM_REVIEW"); // langsung skip MARKETING_APPROVED, auto-lanjut
-        return pengajuanRepository.save(pengajuan);
+        String statusFrom = pengajuan.getStatus();
+
+        pengajuan.setStatus("BM_REVIEW");
+        PengajuanEntity saved = pengajuanRepository.save(pengajuan);
+
+        UserEntity user = getStaffUser(currentUsername);
+        reviewLogService.record(saved, user, "APPROVE", statusFrom, saved.getStatus(), request.getCatatan());
+        notificationService.create(saved.getCustomer(), saved, 
+        "Pengajuan Disetujui", "Pengajuan Anda telah disetujui oleh Marketing dan diteruskan ke BM untuk ditinjau.");
+
+        return saved;
     }
 
     @Transactional
-    public PengajuanEntity marketingReject(UUID id, PengajuanReviewRequest request) {
+    public PengajuanEntity marketingReject(UUID id, String currentUsername, PengajuanReviewRequest request) {
         PengajuanEntity pengajuan = requireStatus(id, "MARKETING_REVIEW");
+        String statusFrom = pengajuan.getStatus();
+
         pengajuan.setStatus("MARKETING_REJECTED");
-        return pengajuanRepository.save(pengajuan);
+        PengajuanEntity saved = pengajuanRepository.save(pengajuan);
+
+        UserEntity user = getStaffUser(currentUsername);
+        reviewLogService.record(saved, user, "REJECT", statusFrom, saved.getStatus(), request.getCatatan());
+        notificationService.create(saved.getCustomer(), saved,
+        "Pengajuan Ditolak", "Pengajuan Anda telah ditolak oleh Marketing. Silakan periksa catatan untuk informasi lebih lanjut.");
+
+        return saved;
     }
 
     // ==== BM actions ====
 
     @Transactional
-    public PengajuanEntity bmApprove(UUID id, PengajuanReviewRequest request) {
+    public PengajuanEntity bmApprove(UUID id, String currentUsername, PengajuanReviewRequest request) {
         PengajuanEntity pengajuan = requireStatus(id, "BM_REVIEW");
+        String statusFrom = pengajuan.getStatus();
 
         if (request.getNominalDisetujui() == null) {
             throw new BusinessRuleException("Nominal disetujui wajib diisi");
@@ -100,26 +127,50 @@ public class PengajuanService {
         }
 
         pengajuan.setNominalDisetujui(request.getNominalDisetujui());
-        pengajuan.setStatus("BACKOFFICE_REVIEW"); // langsung skip BM_APPROVED, auto-lanjut
-        return pengajuanRepository.save(pengajuan);
+        pengajuan.setStatus("BACKOFFICE_REVIEW");
+        PengajuanEntity saved = pengajuanRepository.save(pengajuan);
+
+        UserEntity user = getStaffUser(currentUsername);
+        reviewLogService.record(saved, user, "APPROVE", statusFrom, saved.getStatus(), request.getCatatan());
+        notificationService.create(saved.getCustomer(), saved,
+        "Pengajuan Disetujui oleh Branch Manager", "Pengajuan Anda telah disetujui oleh BM dan diteruskan ke Back Office untuk diproses pencairan.");
+
+        return saved;
     }
 
     @Transactional
-    public PengajuanEntity bmReject(UUID id, PengajuanReviewRequest request) {
+    public PengajuanEntity bmReject(UUID id, String currentUsername, PengajuanReviewRequest request) {
         PengajuanEntity pengajuan = requireStatus(id, "BM_REVIEW");
+        String statusFrom = pengajuan.getStatus();
+
         pengajuan.setStatus("BM_REJECTED");
-        return pengajuanRepository.save(pengajuan);
+        PengajuanEntity saved = pengajuanRepository.save(pengajuan);
+
+        UserEntity user = getStaffUser(currentUsername);
+        reviewLogService.record(saved, user, "REJECT", statusFrom, saved.getStatus(), request.getCatatan());
+        notificationService.create(saved.getCustomer(), saved,
+        "Pengajuan Ditolak oleh Branch Manager", "Pengajuan anda telah ditolak oleh Branch Manager. Pengajuan tidak dapat disetujui. Silakan periksa catatan untuk informasi lebih lanjut.");
+
+        return saved;
     }
+
 
     // ==== BACK_OFFICE action ====
 
     @Transactional
-    public PengajuanEntity disburse(UUID id) {
+    public PengajuanEntity disburse(UUID id, String currentUsername) {
         PengajuanEntity pengajuan = requireStatus(id, "BACKOFFICE_REVIEW");
-        pengajuan.setStatus("DISBURSED");
-        return pengajuanRepository.save(pengajuan);
-    }
+        String statusFrom = pengajuan.getStatus();
 
+        pengajuan.setStatus("DISBURSED");
+        PengajuanEntity saved = pengajuanRepository.save(pengajuan);
+
+        UserEntity user = getStaffUser(currentUsername);
+        reviewLogService.record(saved, user, "DISBURSE", statusFrom, saved.getStatus(), null);
+        notificationService.create(saved.getCustomer(), saved,
+        "Dana Pengajuan berhasil dicairkan!", "Pengajuan Anda telah dicairkan oleh Back Office. Silakan cek rekening Anda untuk memastikan dana telah diterima.");
+        return saved;
+    }
     // ==== CANCEL ====
 
     @Transactional
@@ -173,4 +224,12 @@ public class PengajuanService {
                 || "DISBURSED".equals(status)
                 || "CANCELLED".equals(status);
     }
+
+    private UserEntity getStaffUser(String username) {
+        return userRepository.findByUsernameAndDeletedDateIsNull(username)
+                .orElseThrow(() -> new BusinessRuleException("Staff tidak ditemukan"));
+    }
+
+    
+
 }

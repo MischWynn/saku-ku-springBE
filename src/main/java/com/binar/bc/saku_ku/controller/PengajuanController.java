@@ -5,11 +5,14 @@ import com.binar.bc.saku_ku.dto.PengajuanRequest;
 import com.binar.bc.saku_ku.dto.PengajuanReviewRequest;
 import com.binar.bc.saku_ku.entity.AppCustomerEntity;
 import com.binar.bc.saku_ku.entity.PengajuanEntity;
+import com.binar.bc.saku_ku.entity.ReviewLogEntity;
 import com.binar.bc.saku_ku.service.PengajuanService;
+import com.binar.bc.saku_ku.service.ReviewLogService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.security.core.Authentication;
 
 import java.util.List;
 import java.util.UUID;
@@ -20,6 +23,7 @@ import java.util.UUID;
 public class PengajuanController {
 
     private final PengajuanService pengajuanService;
+    private final ReviewLogService reviewLogService;
 
     // === Customer ===
 
@@ -70,39 +74,55 @@ public class PengajuanController {
 
     @PatchMapping("/{id}/marketing-approve")
     public ApiResponse<PengajuanEntity> marketingApprove(
-            @PathVariable UUID id, @RequestBody PengajuanReviewRequest request
+        @PathVariable UUID id,
+        Authentication authentication,
+        @RequestBody PengajuanReviewRequest request
     ) {
-        return ApiResponse.success(pengajuanService.marketingApprove(id, request), "Pengajuan disetujui Marketing");
+        PengajuanEntity pengajuan = pengajuanService.marketingApprove(id, authentication.getName(), request);
+        return ApiResponse.success(pengajuan, "Pengajuan disetujui Marketing");
     }
 
     @PatchMapping("/{id}/marketing-reject")
     public ApiResponse<PengajuanEntity> marketingReject(
-            @PathVariable UUID id, @RequestBody PengajuanReviewRequest request
+            @PathVariable UUID id,
+            Authentication authentication,
+            @RequestBody PengajuanReviewRequest request
     ) {
-        return ApiResponse.success(pengajuanService.marketingReject(id, request), "Pengajuan ditolak Marketing");
+        PengajuanEntity pengajuan = pengajuanService.marketingReject(id, authentication.getName(), request);
+        return ApiResponse.success(pengajuan, "Pengajuan ditolak Marketing");
     }
 
     // === BM actions ===
 
     @PatchMapping("/{id}/bm-approve")
     public ApiResponse<PengajuanEntity> bmApprove(
-            @PathVariable UUID id, @RequestBody PengajuanReviewRequest request
+            @PathVariable UUID id,
+            Authentication authentication,
+            @RequestBody PengajuanReviewRequest request
     ) {
-        return ApiResponse.success(pengajuanService.bmApprove(id, request), "Pengajuan disetujui BM");
+        PengajuanEntity pengajuan = pengajuanService.bmApprove(id, authentication.getName(), request);
+        return ApiResponse.success(pengajuan, "Pengajuan disetujui BM");
     }
 
     @PatchMapping("/{id}/bm-reject")
     public ApiResponse<PengajuanEntity> bmReject(
-            @PathVariable UUID id, @RequestBody PengajuanReviewRequest request
+            @PathVariable UUID id,
+            Authentication authentication,
+            @RequestBody PengajuanReviewRequest request
     ) {
-        return ApiResponse.success(pengajuanService.bmReject(id, request), "Pengajuan ditolak BM");
+        PengajuanEntity pengajuan = pengajuanService.bmReject(id, authentication.getName(), request);
+        return ApiResponse.success(pengajuan, "Pengajuan ditolak BM");
     }
 
     // === BACK_OFFICE action ===
 
     @PatchMapping("/{id}/disburse")
-    public ApiResponse<PengajuanEntity> disburse(@PathVariable UUID id) {
-        return ApiResponse.success(pengajuanService.disburse(id), "Pengajuan berhasil dicairkan");
+    public ApiResponse<PengajuanEntity> disburse(
+            @PathVariable UUID id,
+            Authentication authentication
+    ) {
+        PengajuanEntity pengajuan = pengajuanService.disburse(id, authentication.getName());
+        return ApiResponse.success(pengajuan, "Pengajuan berhasil dicairkan");
     }
 
     // === SUPERADMIN override ===
@@ -110,5 +130,11 @@ public class PengajuanController {
     @PatchMapping("/{id}/cancel-admin")
     public ApiResponse<PengajuanEntity> cancelBySuperadmin(@PathVariable UUID id) {
         return ApiResponse.success(pengajuanService.cancelBySuperadmin(id), "Pengajuan dibatalkan oleh admin");
+    }
+
+    @GetMapping("/{id}/history")
+    public ApiResponse<List<ReviewLogEntity>> getHistory(@PathVariable UUID id) {
+        List<ReviewLogEntity> history = reviewLogService.getHistoryByPengajuan(id);
+        return ApiResponse.success(history, "History pengajuan berhasil diambil");
     }
 }
