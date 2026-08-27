@@ -4,18 +4,12 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.security.crypto.password.PasswordEncoder;
-import com.binar.bc.saku_ku.repository.RoleRepository;
-import com.binar.bc.saku_ku.repository.UserRepository;
-import com.binar.bc.saku_ku.service.JwtService;
 import com.binar.bc.saku_ku.dto.*;
 import org.springframework.http.ResponseEntity;
 import java.time.Instant;
 import java.util.Optional;
 import com.binar.bc.saku_ku.exception.UnauthorizedException;
 import com.binar.bc.saku_ku.entity.AppUserEntity;
-
-import com.binar.bc.saku_ku.service.AppUserDetailsService;
-
 
 @Service
 @Transactional
@@ -36,7 +30,7 @@ public class AuthService {
 
         AppUserEntity user = found.get();
         String token = jwtService.issue(user.getUsername(), user.getRole(), Instant.now());
-        return ResponseEntity.ok(new AuthResponseDTO(token));
+        return ResponseEntity.ok(new AuthResponseDTO(token, user.getRole()));
     }
 
 

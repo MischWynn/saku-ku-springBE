@@ -52,7 +52,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/v1/customer/register").permitAll()
                         .requestMatchers("/api/v1/customer/login").permitAll()
                         .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/pengajuan/**")
-        .hasAnyRole("SUPERADMIN", "MARKETING", "BM", "BACK_OFFICE")
+                                .hasAnyRole("SUPERADMIN", "MARKETING", "BM", "BACK_OFFICE")
 
                         // rule spesifik /me HARUS di atas rule wildcard {id}
                         .requestMatchers(org.springframework.http.HttpMethod.PATCH, "/api/v1/user/me")
@@ -160,13 +160,14 @@ public class SecurityConfig {
     CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration konfigurasi = new CorsConfiguration();
         konfigurasi.setAllowedOrigins(allowedOrigins);
-        konfigurasi.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
-        konfigurasi.setAllowedHeaders(List.of("Authorization", "Content-Type"));
+        konfigurasi.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
+        konfigurasi.setAllowedHeaders(List.of("Authorization", "Content-Type", "Accept", "X-Requested-With"));
+        konfigurasi.setExposedHeaders(List.of("Authorization"));
         konfigurasi.setAllowCredentials(true);
         konfigurasi.setMaxAge(3600L);
 
         UrlBasedCorsConfigurationSource sumber = new UrlBasedCorsConfigurationSource();
-        sumber.registerCorsConfiguration("/api/**", konfigurasi);
+        sumber.registerCorsConfiguration("/**", konfigurasi);
         return sumber;
     }
 
