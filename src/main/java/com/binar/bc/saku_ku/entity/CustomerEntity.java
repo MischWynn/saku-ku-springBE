@@ -5,8 +5,11 @@ import lombok.Getter;
 import lombok.Setter;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.UUID;
+
+import com.fasterxml.jackson.annotation.JsonIgnore;
 
 @Entity
 @Table(name = "tbl_customer")
@@ -37,11 +40,34 @@ public class CustomerEntity {
     @Column(name = "plafond", nullable = false, precision = 18, scale = 2)
     private BigDecimal plafond;
 
-    @Column(name = "password_hash", nullable = false, length = 255)
+    @ JsonIgnore
+    @Column(name = "password_hash", nullable = false)
     private String passwordHash;
 
     @Column(name = "status", nullable = false, length = 20)
     private String status;
+
+    // Ditambah 3 Sept 2026 (lanjutan migration tujuan_pinjaman) — semua nullable,
+    // data lama & customer yang belum lengkapin profil bakal null. Dipakai buat
+    // scoring input di drawer (Employment & Financial section, FE).
+    @Column(name = "tanggal_lahir")
+    private LocalDate tanggalLahir;
+
+    // KARYAWAN, WIRASWASTA, LAINNYA — plain String, pola sama kayak `status` (bukan @Enumerated)
+    @Column(name = "tipe_pekerjaan", length = 30)
+    private String tipePekerjaan;
+
+    @Column(name = "pekerjaan", length = 150)
+    private String pekerjaan;
+
+    @Column(name = "lama_bekerja_bulan")
+    private Integer lamaBekerjaBulan;
+
+    @Column(name = "pendapatan_bulanan", precision = 18, scale = 2)
+    private BigDecimal pendapatanBulanan;
+
+    @Column(name = "utang_berjalan", precision = 18, scale = 2)
+    private BigDecimal utangBerjalan;
 
     @Column(name = "created_at", insertable = false, updatable = false)
     private LocalDateTime createdAt;

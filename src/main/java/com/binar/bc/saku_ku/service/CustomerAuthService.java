@@ -28,6 +28,7 @@ public class CustomerAuthService {
     private final AppCustomerDetailsService appCustomerDetailsService;
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
+    private final UserPlafondService userPlafondService;
 
     public CustomerResponseDTO register(CustomerRegisterRequest request) {
         if (customerRepository.existsByEmail(request.getEmail())) {
@@ -49,8 +50,16 @@ public class CustomerAuthService {
         customer.setPasswordHash(passwordEncoder.encode(request.getPassword()));
         customer.setPlafond(BigDecimal.ZERO);
         customer.setStatus("ACTIVE");
+        customer.setTanggalLahir(request.getTanggalLahir());
+        customer.setTipePekerjaan(request.getTipePekerjaan());
+        customer.setPekerjaan(request.getPekerjaan());
+        customer.setLamaBekerjaBulan(request.getLamaBekerjaBulan());
+        customer.setPendapatanBulanan(request.getPendapatanBulanan());
+        customer.setUtangBerjalan(request.getUtangBerjalan());
 
         CustomerEntity saved = customerRepository.save(customer);
+        userPlafondService.calculateAndAssign(saved);
+        saved = customerRepository.save(saved); // persist plafond sync dari calculateAndAssign
         return CustomerResponseDTO.from(saved);
     }
 

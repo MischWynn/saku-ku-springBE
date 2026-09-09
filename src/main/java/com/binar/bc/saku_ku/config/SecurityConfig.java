@@ -54,13 +54,19 @@ public class SecurityConfig {
                         .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/pengajuan/**")
         .hasAnyRole("SUPERADMIN", "MARKETING", "BM", "BACK_OFFICE")
 
-                        // rule spesifik /me HARUS di atas rule wildcard {id}
+                        // rule spesifik /me dan /change-password HARUS di atas rule wildcard {id}
                         .requestMatchers(org.springframework.http.HttpMethod.PATCH, "/api/v1/user/me")
                                 .hasAnyRole("SUPERADMIN", "MARKETING", "BM", "BACK_OFFICE")
                         .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/user/me")
                                 .hasAnyRole("SUPERADMIN", "MARKETING", "BM", "BACK_OFFICE")
+                        .requestMatchers(org.springframework.http.HttpMethod.PATCH, "/api/v1/user/change-password")
+                                .hasAnyRole("SUPERADMIN", "MARKETING", "BM", "BACK_OFFICE")
 
-                        //rule spesifik untuk /tenor 
+                        // Riwayat Review Saya — staff liat riwayat review-nya sendiri (superadmin gak pernah nge-log review, jadi gak dikasih akses)
+                        .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/review-log/me")
+                                .hasAnyRole("MARKETING", "BM", "BACK_OFFICE")
+
+                        //rule spesifik untuk /tenor
                         .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/bunga-tenor/**")
                                 .hasAnyRole("SUPERADMIN", "MARKETING")
                         .requestMatchers(org.springframework.http.HttpMethod.POST, "/api/v1/bunga-tenor")
@@ -68,6 +74,8 @@ public class SecurityConfig {
                         .requestMatchers(org.springframework.http.HttpMethod.PATCH, "/api/v1/bunga-tenor/{id}")
                                 .hasRole("SUPERADMIN")
                         .requestMatchers(org.springframework.http.HttpMethod.DELETE, "/api/v1/bunga-tenor/{id}")
+                                .hasRole("SUPERADMIN")
+                        .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/dashboard/superadmin/**")
                                 .hasRole("SUPERADMIN")
 
                         // === Pengajuan: Customer ===
@@ -109,7 +117,26 @@ public class SecurityConfig {
                         // baru rule wildcard {id}, taruh di bawah
                         .requestMatchers(org.springframework.http.HttpMethod.POST, "/api/v1/user").hasRole("SUPERADMIN")
                         .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/user").hasRole("SUPERADMIN")
+                        .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/user/{id}").hasRole("SUPERADMIN")
                         .requestMatchers(org.springframework.http.HttpMethod.PATCH, "/api/v1/user/{id}").hasRole("SUPERADMIN")
+                        .requestMatchers(org.springframework.http.HttpMethod.DELETE, "/api/v1/user/{id}").hasRole("SUPERADMIN")
+
+                        // === Master Role (superadmin only) ===
+                        .requestMatchers("/api/v1/role/**").hasRole("SUPERADMIN")
+
+                        // === Master Menu (superadmin only) ===
+                        .requestMatchers("/api/v1/menu/**").hasRole("SUPERADMIN")
+
+                        // === Master Plafond (superadmin only) ===
+                        .requestMatchers("/api/v1/plafond/**").hasRole("SUPERADMIN")
+
+                        // rule spesifik /me HARUS di atas rule wildcard /api/v1/role-menu/** —
+                        // dipakai sidebar buat semua role staff, bukan cuma superadmin.
+                        .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/role-menu/me")
+                                .hasAnyRole("SUPERADMIN", "MARKETING", "BM", "BACK_OFFICE")
+
+                        // === Master Access (superadmin only) ===
+                        .requestMatchers("/api/v1/role-menu/**").hasRole("SUPERADMIN")
 
                         .anyRequest().authenticated()
                 )                              .exceptionHandling(handling -> handling
@@ -160,7 +187,7 @@ public class SecurityConfig {
     CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration konfigurasi = new CorsConfiguration();
         konfigurasi.setAllowedOrigins(allowedOrigins);
-        konfigurasi.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
+        konfigurasi.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         konfigurasi.setAllowedHeaders(List.of("Authorization", "Content-Type"));
         konfigurasi.setAllowCredentials(true);
         konfigurasi.setMaxAge(3600L);

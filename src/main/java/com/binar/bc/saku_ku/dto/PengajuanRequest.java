@@ -18,4 +18,7 @@ public class PengajuanRequest {
     @NotNull(message = "Nominal pengajuan tidak boleh kosong")
     @DecimalMin(value = "0.0", inclusive = false, message = "Nominal pengajuan harus lebih dari 0")
     private BigDecimal nominalPengajuan;
+
+    // Opsional dulu (Android customer app belum ada) — MODAL_USAHA/KONSUMTIF/PENDIDIKAN/KESEHATAN/RENOVASI/LAINNYA
+    private String tujuanPinjaman;
 }

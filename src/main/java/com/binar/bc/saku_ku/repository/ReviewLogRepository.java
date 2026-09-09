@@ -9,4 +9,8 @@ import java.util.UUID;
 public interface ReviewLogRepository extends JpaRepository<ReviewLogEntity, UUID> {
 
     List<ReviewLogEntity> findByPengajuanIdOrderByCreatedAtAsc(UUID pengajuanId);
+
+    List<ReviewLogEntity> findTop10ByOrderByCreatedAtDesc();
+
+    List<ReviewLogEntity> findByUser_IdOrderByCreatedAtDesc(UUID userId);
 }

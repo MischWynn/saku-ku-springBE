@@ -6,6 +6,9 @@ import jakarta.validation.constraints.Pattern;
 import lombok.Getter;
 import lombok.Setter;
 
+import java.math.BigDecimal;
+import java.time.LocalDate;
+
 @Getter
 @Setter
 public class CustomerRegisterRequest {
@@ -28,4 +31,12 @@ public class CustomerRegisterRequest {
 
     @NotBlank(message = "Password cannot be empty")
     private String password;
+
+    // Opsional dulu (Android customer app belum ada yang ngirim ini)
+    private LocalDate tanggalLahir;
+    private String tipePekerjaan; // KARYAWAN, WIRASWASTA, LAINNYA
+    private String pekerjaan;
+    private Integer lamaBekerjaBulan;
+    private BigDecimal pendapatanBulanan;
+    private BigDecimal utangBerjalan;
 }

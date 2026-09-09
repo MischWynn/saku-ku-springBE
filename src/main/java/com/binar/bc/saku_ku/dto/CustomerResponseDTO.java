@@ -5,6 +5,7 @@ import lombok.Getter;
 import lombok.Setter;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.UUID;
 
 @Getter
@@ -19,6 +20,12 @@ public class CustomerResponseDTO {
     private String alamat;
     private BigDecimal plafond;
     private String status;
+    private LocalDate tanggalLahir;
+    private String tipePekerjaan;
+    private String pekerjaan;
+    private Integer lamaBekerjaBulan;
+    private BigDecimal pendapatanBulanan;
+    private BigDecimal utangBerjalan;
 
     public static CustomerResponseDTO from(CustomerEntity customer) {
         if (customer == null) return null;
@@ -32,6 +39,12 @@ public class CustomerResponseDTO {
         dto.setAlamat(customer.getAlamat());
         dto.setPlafond(customer.getPlafond());
         dto.setStatus(customer.getStatus());
+        dto.setTanggalLahir(customer.getTanggalLahir());
+        dto.setTipePekerjaan(customer.getTipePekerjaan());
+        dto.setPekerjaan(customer.getPekerjaan());
+        dto.setLamaBekerjaBulan(customer.getLamaBekerjaBulan());
+        dto.setPendapatanBulanan(customer.getPendapatanBulanan());
+        dto.setUtangBerjalan(customer.getUtangBerjalan());
         return dto;
     }
 }

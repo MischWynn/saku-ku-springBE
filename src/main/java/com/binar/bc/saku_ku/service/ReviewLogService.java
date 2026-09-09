@@ -42,4 +42,9 @@ public class ReviewLogService {
     public List<ReviewLogEntity> getHistoryByPengajuan(UUID pengajuanId) {
         return reviewLogRepository.findByPengajuanIdOrderByCreatedAtAsc(pengajuanId);
     }
+
+    @Transactional(readOnly = true)
+    public List<ReviewLogEntity> getByUser(UUID userId) {
+        return reviewLogRepository.findByUser_IdOrderByCreatedAtDesc(userId);
+    }
 }

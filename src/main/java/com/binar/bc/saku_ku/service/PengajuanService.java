@@ -6,10 +6,12 @@ import com.binar.bc.saku_ku.entity.BungaTenorEntity;
 import com.binar.bc.saku_ku.entity.CustomerEntity;
 import com.binar.bc.saku_ku.entity.PengajuanEntity;
 import com.binar.bc.saku_ku.entity.UserEntity;
+import com.binar.bc.saku_ku.entity.UserPlafondEntity;
 import com.binar.bc.saku_ku.exception.BusinessRuleException;
 import com.binar.bc.saku_ku.repository.BungaTenorRepository;
 import com.binar.bc.saku_ku.repository.CustomerRepository;
 import com.binar.bc.saku_ku.repository.PengajuanRepository;
+import com.binar.bc.saku_ku.repository.UserPlafondRepository;
 import com.binar.bc.saku_ku.repository.UserRepository;
 import com.binar.bc.saku_ku.service.NotificationService;
 
@@ -18,6 +20,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.UUID;
 
@@ -32,6 +35,7 @@ public class PengajuanService {
     private final ReviewLogService reviewLogService;
     private final UserRepository userRepository;
     private final NotificationService notificationService;
+    private final UserPlafondRepository userPlafondRepository;
 
     // ==== CREATE (oleh Customer) ====
 
@@ -47,6 +51,17 @@ public class PengajuanService {
             throw new BusinessRuleException("Tenor yang dipilih sedang tidak aktif");
         }
 
+        // Plafond check — limit_efektif (tbl_user_plafond) kalau ada, fallback ke kolom
+        // lama tbl_customer.plafond buat customer yang belum kena hitung otomatis
+        // (mis. data seed lama, atau daftar sebelum tbl_plafond ke-seed).
+        BigDecimal effectiveLimit = userPlafondRepository.findByCustomer_Id(customer.getId())
+                .map(UserPlafondEntity::getLimitEfektif)
+                .orElse(customer.getPlafond());
+        if (effectiveLimit != null && request.getNominalPengajuan().compareTo(effectiveLimit) > 0) {
+            throw new BusinessRuleException(
+                    "Nominal pengajuan melebihi plafond Anda (maksimal Rp " + effectiveLimit + ")");
+        }
+
         PengajuanEntity pengajuan = new PengajuanEntity();
         pengajuan.setCustomer(customer);
         pengajuan.setBungaTenor(bungaTenor);
@@ -54,6 +69,7 @@ public class PengajuanService {
         // snapshot, bukan reference dinamis
         pengajuan.setTenor(bungaTenor.getTenor());
         pengajuan.setInterestRate(bungaTenor.getInterestRate());
+        pengajuan.setTujuanPinjaman(request.getTujuanPinjaman());
         pengajuan.setStatus("MARKETING_REVIEW"); // langsung skip SUBMITTED
 
         return pengajuanRepository.save(pengajuan);

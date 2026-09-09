@@ -7,6 +7,7 @@ import java.util.UUID;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
+import com.binar.bc.saku_ku.dto.ChangePasswordRequest;
 import com.binar.bc.saku_ku.dto.ForgotPasswordRequest;
 import com.binar.bc.saku_ku.dto.RegisterRequest;
 import com.binar.bc.saku_ku.dto.ResetPasswordRequest;
@@ -50,6 +51,18 @@ public class UserManagementService {
         user.setPasswordHash(passwordEncoder.encode(request.getNewPassword()));
         userRepository.save(user); // save di sini cuma buat update password, bukan buat simpan token
     }   
+
+    public void changePassword(String username, ChangePasswordRequest request) {
+        UserEntity user = userRepository.findByUsernameAndDeletedDateIsNull(username)
+                .orElseThrow(() -> new UnauthorizedException("User tidak ditemukan"));
+
+        if (!passwordEncoder.matches(request.getOldPassword(), user.getPasswordHash())) {
+            throw new UnauthorizedException("Password lama salah");
+        }
+
+        user.setPasswordHash(passwordEncoder.encode(request.getNewPassword()));
+        userRepository.save(user);
+    }
 
     public UserEntity createUser(RegisterRequest request) {
         RoleEntity role = roleRepository.findByNamaRole(request.getRoleName())

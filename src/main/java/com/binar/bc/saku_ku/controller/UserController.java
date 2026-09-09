@@ -1,13 +1,22 @@
 package com.binar.bc.saku_ku.controller;
 
 import com.binar.bc.saku_ku.dto.ApiResponse;
+import com.binar.bc.saku_ku.dto.ChangePasswordRequest;
 import com.binar.bc.saku_ku.dto.UpdateProfileRequest;
 import com.binar.bc.saku_ku.dto.UpdateUserRequest;
+import com.binar.bc.saku_ku.dto.UserProfileDTO;
 import com.binar.bc.saku_ku.entity.AppUserEntity;
 import com.binar.bc.saku_ku.entity.UserEntity;
+import com.binar.bc.saku_ku.repository.UserRepository;
+import com.binar.bc.saku_ku.exception.UnauthorizedException;
+import com.binar.bc.saku_ku.service.UserManagementService;
 import com.binar.bc.saku_ku.service.UserService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.UUID;
@@ -19,6 +28,8 @@ import java.util.List;
 public class UserController {
 
     private final UserService userService;
+    private final UserRepository userRepository;
+    private final UserManagementService userManagementService;
 
     //PATCH UPDATE /api/v1/user/me
     @PatchMapping("/me")
@@ -30,7 +41,16 @@ public class UserController {
                 currentUser.getUsername(), request.getNamaLengkap(), request.getEmail());
         return ApiResponse.success(user, "Profile updated successfully");
     }
-   
+
+    //PATCH /api/v1/user/change-password — ganti password saat udah login, beda dari forgot/reset-password
+    @PatchMapping("/change-password")
+    public ApiResponse<String> changePassword(@Valid @RequestBody ChangePasswordRequest request) {
+        String username = SecurityContextHolder.getContext().getAuthentication().getName();
+        userManagementService.changePassword(username, request);
+        return ApiResponse.success(null, "Password berhasil diganti");
+    }
+
+
     //PATCH /api/v1/user/{id}
     @PatchMapping("/{id}")
     public ApiResponse<UserEntity> updateUserBySuperadmin(
@@ -51,11 +71,25 @@ public class UserController {
     }
 
     //GET /api/v1/user/me
+
     @GetMapping("/me")
-    public ApiResponse<UserEntity> getCurrentUser(@AuthenticationPrincipal AppUserEntity currentUser) {
-        UserEntity user = userService.getUserByUsername(currentUser.getUsername());
-        return ApiResponse.success(user, "Current user retrieved successfully");
+    public ApiResponse<UserProfileDTO> getCurrentUser() {
+        String username = SecurityContextHolder.getContext().getAuthentication().getName();
+        UserEntity user = userRepository.findByUsername(username)
+            .orElseThrow(() -> new UnauthorizedException("User tidak ditemukan"));
+
+        UserProfileDTO dto = new UserProfileDTO(
+            user.getNamaLengkap(),
+            user.getRole().getNamaRole()
+        );
+        return ApiResponse.success(dto, "OK");
     }
+
+    // @GetMapping("/me")
+    // public ApiResponse<UserEntity> getCurrentUser(@AuthenticationPrincipal AppUserEntity currentUser) {
+    //     UserEntity user = userService.getUserByUsername(currentUser.getUsername());
+    //     return ApiResponse.success(user, "Current user retrieved successfully");
+    // }
 
     //GET /api/v1/user/{id}
     @GetMapping("/{id}")
