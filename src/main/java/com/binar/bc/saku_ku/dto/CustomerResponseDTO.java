@@ -26,6 +26,13 @@ public class CustomerResponseDTO {
     private Integer lamaBekerjaBulan;
     private BigDecimal pendapatanBulanan;
     private BigDecimal utangBerjalan;
+    // Computed, bukan kolom DB — limit dikurangi yang lagi "ketahan" di pipeline review/DISBURSED.
+    // Diisi terpisah oleh caller (lihat CustomerAuthService) karena butuh PengajuanService, DTO ini
+    // sengaja tetap murni entity mapper.
+    private BigDecimal sisaPlafond;
+    // Computed juga — nama tier (Bronze/Silver/Gold/Platinum), bukan flat amount (lihat
+    // UserPlafondService.getTierName()). Diisi terpisah oleh caller, sama pola kayak sisaPlafond.
+    private String tierPlafond;
 
     public static CustomerResponseDTO from(CustomerEntity customer) {
         if (customer == null) return null;

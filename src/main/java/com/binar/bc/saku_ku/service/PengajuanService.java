@@ -51,15 +51,19 @@ public class PengajuanService {
             throw new BusinessRuleException("Tenor yang dipilih sedang tidak aktif");
         }
 
-        // Plafond check — limit_efektif (tbl_user_plafond) kalau ada, fallback ke kolom
-        // lama tbl_customer.plafond buat customer yang belum kena hitung otomatis
-        // (mis. data seed lama, atau daftar sebelum tbl_plafond ke-seed).
-        BigDecimal effectiveLimit = userPlafondRepository.findByCustomer_Id(customer.getId())
-                .map(UserPlafondEntity::getLimitEfektif)
-                .orElse(customer.getPlafond());
-        if (effectiveLimit != null && request.getNominalPengajuan().compareTo(effectiveLimit) > 0) {
-            throw new BusinessRuleException(
-                    "Nominal pengajuan melebihi plafond Anda (maksimal Rp " + effectiveLimit + ")");
+        // Plafond check — bukan cuma vs limit TOTAL, tapi vs SISA (limit dikurangi yang udah
+        // "ketahan" oleh pengajuan lain yang masih di pipeline review atau udah DISBURSED).
+        // Sebelum ini, customer bisa apply berkali-kali sampai ngelebihin limit gabungan
+        // (masing-masing pengajuan cuma dicek < limit total sendiri-sendiri) — dibenerin 13 Sept 2026.
+        BigDecimal effectiveLimit = getEffectiveLimit(customer);
+        if (effectiveLimit != null) {
+            BigDecimal heldNominal = pengajuanRepository.sumHeldNominalByCustomer(customer.getId());
+            BigDecimal sisaPlafond = effectiveLimit.subtract(heldNominal).max(BigDecimal.ZERO);
+            if (request.getNominalPengajuan().compareTo(sisaPlafond) > 0) {
+                throw new BusinessRuleException(
+                        "Nominal pengajuan melebihi sisa plafond Anda (sisa Rp " + sisaPlafond
+                                + " dari limit Rp " + effectiveLimit + ", sedang terpakai Rp " + heldNominal + ")");
+            }
         }
 
         PengajuanEntity pengajuan = new PengajuanEntity();
@@ -217,6 +221,23 @@ public class PengajuanService {
 
         pengajuan.setStatus("CANCELLED");
         return pengajuanRepository.save(pengajuan);
+    }
+
+    // ==== Sisa plafond (dipakai juga oleh CustomerAuthService buat customer/me) ====
+
+    public BigDecimal getEffectiveLimit(CustomerEntity customer) {
+        return userPlafondRepository.findByCustomer_Id(customer.getId())
+                .map(UserPlafondEntity::getLimitEfektif)
+                .orElse(customer.getPlafond());
+    }
+
+    public BigDecimal getSisaPlafond(CustomerEntity customer) {
+        BigDecimal effectiveLimit = getEffectiveLimit(customer);
+        if (effectiveLimit == null) {
+            return null;
+        }
+        BigDecimal heldNominal = pengajuanRepository.sumHeldNominalByCustomer(customer.getId());
+        return effectiveLimit.subtract(heldNominal).max(BigDecimal.ZERO);
     }
 
     // ==== Helper internal ====

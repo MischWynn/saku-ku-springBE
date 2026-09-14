@@ -53,7 +53,9 @@ public class CustomerEntity {
     @Column(name = "tanggal_lahir")
     private LocalDate tanggalLahir;
 
-    // KARYAWAN, WIRASWASTA, LAINNYA — plain String, pola sama kayak `status` (bukan @Enumerated)
+    // ASN_TNI_POLRI, BUMN_BUMD, SWASTA, WIRASWASTA, NON_PROFIT, FREELANCE, TIDAK_BEKERJA —
+    // plain String, pola sama kayak `status` (bukan @Enumerated). Diperluas dari 4 ke 7
+    // kategori 10 Sept 2026; value lama (KARYAWAN/PNS) tetap valid di data existing.
     @Column(name = "tipe_pekerjaan", length = 30)
     private String tipePekerjaan;
 

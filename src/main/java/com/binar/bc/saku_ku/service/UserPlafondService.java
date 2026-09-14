@@ -21,6 +21,11 @@ import java.util.List;
  *
  * Kalau data pendapatan/pekerjaan customer belum lengkap (null, mis. Android app belum
  * pernah ngirim), fallback ke minimum absolut Rp2.000.000 (tier Bronze).
+ *
+ * tipe_pekerjaan diperluas jadi 7 kategori (10 Sept 2026, lihat employmentMultiplier()) —
+ * sebelumnya cuma KARYAWAN/WIRASWASTA/PNS/LAINNYA, sekarang lebih presisi ke kategori
+ * ketenagakerjaan Indonesia asli. Value lama tetap didukung (backward-compatible, gak
+ * perlu migration data lama).
  */
 @Service
 @RequiredArgsConstructor
@@ -64,6 +69,17 @@ public class UserPlafondService {
         return saved;
     }
 
+    /**
+     * Nama tier (Bronze/Silver/Gold/Platinum) customer saat ini — dipakai FE (kartu Plafond
+     * Android) buat nampilin "Bronze Tier" dst. Bukan flat amount, cuma label bucket — lihat
+     * catatan di pickTier(), angka aktual customer tetap di limitEfektif, bukan tier.limitMaksimal.
+     */
+    public String getTierName(CustomerEntity customer) {
+        return userPlafondRepository.findByCustomer_Id(customer.getId())
+                .map(up -> up.getPlafond().getNamaPlafond())
+                .orElse(null);
+    }
+
     private BigDecimal computeRawAmount(CustomerEntity customer) {
         if (customer.getPendapatanBulanan() == null) {
             return MINIMUM_PLAFOND;
@@ -80,12 +96,24 @@ public class UserPlafondService {
         return base.multiply(multiplier);
     }
 
-    // KARYAWAN & PNS dianggap setara (income stabil/gajian tetap) — keputusan user 4 Sept 2026.
+    // 7 kategori resmi (diputuskan 10 Sept 2026, gantiin 4 kategori lama yang kurang presisi):
+    //   ASN_TNI_POLRI, BUMN_BUMD, SWASTA  -> kerja tetap/gaji stabil, skor sama (1.0)
+    //   WIRASWASTA, NON_PROFIT            -> income cukup stabil tapi gak segaransi kerja tetap (0.8)
+    //   FREELANCE                        -> paling gak stabil di antara yang "kerja" (0.6) —
+    //                                        LEBIH RENDAH dari wiraswasta, gak ada revenue stream tetap
+    //   TIDAK_BEKERJA                    -> floor defensif (0.3) — kasus netIncome<=0 udah ke-floor
+    //                                        minimum plafond duluan di computeRawAmount, ini jaga-jaga
+    //                                        kalau ada income (mis. pasif/keluarga) meski status nganggur
+    // Value lama (KARYAWAN/PNS) tetap didukung — data customer sebelum 10 Sept 2026 gak perlu migration.
     private BigDecimal employmentMultiplier(String tipePekerjaan) {
         if (tipePekerjaan == null) return new BigDecimal("0.7");
         return switch (tipePekerjaan) {
+            case "ASN_TNI_POLRI", "BUMN_BUMD", "SWASTA" -> new BigDecimal("1.0");
+            case "WIRASWASTA", "NON_PROFIT" -> new BigDecimal("0.8");
+            case "FREELANCE" -> new BigDecimal("0.6");
+            case "TIDAK_BEKERJA" -> new BigDecimal("0.3");
+            // Legacy, sebelum kategori diperluas
             case "KARYAWAN", "PNS" -> new BigDecimal("1.0");
-            case "WIRASWASTA" -> new BigDecimal("0.8");
             default -> new BigDecimal("0.7");
         };
     }

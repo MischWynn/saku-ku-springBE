@@ -51,6 +51,30 @@ public class SecurityConfig {
                         .requestMatchers("/api/v1/user/reset-password").permitAll()
                         .requestMatchers("/api/v1/customer/register").permitAll()
                         .requestMatchers("/api/v1/customer/login").permitAll()
+                        .requestMatchers("/api/v1/customer/verify-otp").permitAll()
+                        .requestMatchers("/api/v1/customer/resend-otp").permitAll()
+                        .requestMatchers("/api/v1/customer/forgot-password").permitAll()
+                        .requestMatchers("/api/v1/customer/reset-password").permitAll()
+
+                        // rule spesifik /me HARUS di atas anyRequest().authenticated() — tanpa ini,
+                        // GET/PATCH /customer/me kena rule generik yang nerima role manapun (termasuk
+                        // staff), padahal @AuthenticationPrincipal AppCustomerEntity bakal null/gagal
+                        // kalau yang lagi login itu staff, bukan customer.
+                        .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/customer/me")
+                                .hasRole("CUSTOMER")
+                        .requestMatchers(org.springframework.http.HttpMethod.PATCH, "/api/v1/customer/me")
+                                .hasRole("CUSTOMER")
+
+                        // "/me" HARUS di atas wildcard "/pengajuan/**" di bawah - kebalik sebelumnya
+                        // (13 Sept), bikin customer selalu 403 pas GET pengajuan/me karena wildcard
+                        // staff-only ke-match duluan. Pola yang sama (spesifik sebelum wildcard) udah
+                        // bener diterapin di /user/me dan /role-menu/me, cuma di sini kebalik.
+                        .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/pengajuan/me")
+                                .hasRole("CUSTOMER")
+                        // Timeline versi customer (DTO terfilter, endpoint terpisah dari
+                        // /{id}/history yang staff pakai) - taro di atas wildcard, pelajaran sama.
+                        .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/pengajuan/{id}/history/me")
+                                .hasRole("CUSTOMER")
                         .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/pengajuan/**")
         .hasAnyRole("SUPERADMIN", "MARKETING", "BM", "BACK_OFFICE")
 
@@ -66,9 +90,11 @@ public class SecurityConfig {
                         .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/review-log/me")
                                 .hasAnyRole("MARKETING", "BM", "BACK_OFFICE")
 
-                        //rule spesifik untuk /tenor
+                        // Publicly browsable (butuh diliat tanpa login — homepage/simulasi customer,
+                        // dan Android buat isi tenor picker pas Ajukan Pinjaman). Write ops tetap
+                        // dibatasin di bawah (POST/PATCH/DELETE superadmin-only).
                         .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/bunga-tenor/**")
-                                .hasAnyRole("SUPERADMIN", "MARKETING")
+                                .permitAll()
                         .requestMatchers(org.springframework.http.HttpMethod.POST, "/api/v1/bunga-tenor")
                                 .hasRole("SUPERADMIN")
                         .requestMatchers(org.springframework.http.HttpMethod.PATCH, "/api/v1/bunga-tenor/{id}")
@@ -79,9 +105,8 @@ public class SecurityConfig {
                                 .hasRole("SUPERADMIN")
 
                         // === Pengajuan: Customer ===
+                        // (GET /pengajuan/me udah dideklarasiin di atas, sebelum wildcard /pengajuan/**)
                         .requestMatchers(org.springframework.http.HttpMethod.POST, "/api/v1/pengajuan")
-                                .hasRole("CUSTOMER")
-                        .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/pengajuan/me")
                                 .hasRole("CUSTOMER")
                         .requestMatchers(org.springframework.http.HttpMethod.PATCH, "/api/v1/pengajuan/{id}/cancel")
                                 .hasRole("CUSTOMER")
@@ -127,7 +152,12 @@ public class SecurityConfig {
                         // === Master Menu (superadmin only) ===
                         .requestMatchers("/api/v1/menu/**").hasRole("SUPERADMIN")
 
-                        // === Master Plafond (superadmin only) ===
+                        // Publicly browsable tier catalog — sama alasan kayak bunga-tenor di atas.
+                        // Rule spesifik GET ini HARUS di atas wildcard superadmin-only di bawahnya.
+                        .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/plafond/**")
+                                .permitAll()
+
+                        // === Master Plafond writes (superadmin only) ===
                         .requestMatchers("/api/v1/plafond/**").hasRole("SUPERADMIN")
 
                         // rule spesifik /me HARUS di atas rule wildcard /api/v1/role-menu/** —

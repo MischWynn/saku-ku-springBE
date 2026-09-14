@@ -1,11 +1,13 @@
 package com.binar.bc.saku_ku.controller;
 
 import com.binar.bc.saku_ku.dto.ApiResponse;
+import com.binar.bc.saku_ku.dto.PengajuanHistoryCustomerDTO;
 import com.binar.bc.saku_ku.dto.PengajuanRequest;
 import com.binar.bc.saku_ku.dto.PengajuanReviewRequest;
 import com.binar.bc.saku_ku.entity.AppCustomerEntity;
 import com.binar.bc.saku_ku.entity.PengajuanEntity;
 import com.binar.bc.saku_ku.entity.ReviewLogEntity;
+import com.binar.bc.saku_ku.exception.BusinessRuleException;
 import com.binar.bc.saku_ku.service.PengajuanService;
 import com.binar.bc.saku_ku.service.ReviewLogService;
 import jakarta.validation.Valid;
@@ -51,6 +53,24 @@ public class PengajuanController {
     ) {
         PengajuanEntity pengajuan = pengajuanService.cancelByCustomer(id, currentCustomer.getId());
         return ApiResponse.success(pengajuan, "Pengajuan berhasil dibatalkan");
+    }
+
+    // Versi customer dari /{id}/history di bawah - endpoint TERPISAH (bukan dibuka bareng),
+    // balikin DTO yang difilter (gak ada identitas staff/user internal) + wajib cek
+    // kepemilikan dulu, beda dari versi staff yang tetap balikin ReviewLogEntity mentah.
+    @GetMapping("/{id}/history/me")
+    public ApiResponse<List<PengajuanHistoryCustomerDTO>> getMyHistory(
+            @PathVariable UUID id,
+            @AuthenticationPrincipal AppCustomerEntity currentCustomer
+    ) {
+        PengajuanEntity pengajuan = pengajuanService.getById(id);
+        if (!pengajuan.getCustomer().getId().equals(currentCustomer.getId())) {
+            throw new BusinessRuleException("Anda tidak berhak mengakses riwayat pengajuan ini");
+        }
+        List<PengajuanHistoryCustomerDTO> history = reviewLogService.getHistoryByPengajuan(id).stream()
+                .map(PengajuanHistoryCustomerDTO::from)
+                .toList();
+        return ApiResponse.success(history, "Riwayat pengajuan berhasil diambil");
     }
 
     // === Staff (read) ===

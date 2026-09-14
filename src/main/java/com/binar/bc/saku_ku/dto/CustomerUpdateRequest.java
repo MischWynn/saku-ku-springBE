@@ -1,38 +1,26 @@
 package com.binar.bc.saku_ku.dto;
 
 import jakarta.validation.constraints.Email;
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.Pattern;
 import lombok.Getter;
 import lombok.Setter;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
 
+// Semua field optional — partial update, pola sama kayak UpdateUserRequest (staff).
+// NIK dan password sengaja TIDAK ada di sini: NIK itu identitas permanen, ganti password
+// punya jalur sendiri (forgot/reset-password), bukan lewat edit profil biasa.
 @Getter
 @Setter
-public class CustomerRegisterRequest {
+public class CustomerUpdateRequest {
 
-    @NotBlank(message = "Full name cannot be empty")
     private String namaLengkap;
 
-    @NotBlank(message = "NIK cannot be empty")
-    @Pattern(regexp = "\\d{16}", message = "NIK must be 16 digits")
-    private String nik;
-
-    @NotBlank(message = "Phone Number cannot be empty")
-    private String noHp;
-
-    @NotBlank(message = "Email cannot be empty")
     @Email(message = "Invalid email format")
     private String email;
 
+    private String noHp;
     private String alamat;
-
-    @NotBlank(message = "Password cannot be empty")
-    private String password;
-
-    // Opsional dulu (Android customer app belum ada yang ngirim ini)
     private LocalDate tanggalLahir;
     // ASN_TNI_POLRI, BUMN_BUMD, SWASTA, WIRASWASTA, NON_PROFIT, FREELANCE, TIDAK_BEKERJA
     private String tipePekerjaan;
