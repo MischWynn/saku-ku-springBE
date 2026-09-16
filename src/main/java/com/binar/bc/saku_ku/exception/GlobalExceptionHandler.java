@@ -39,9 +39,14 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         return build(HttpStatus.UNPROCESSABLE_CONTENT, e.getMessage());
     }
 
+    // Catch-all buat runtime exception yang gak ke-handle handler spesifik manapun di atas
+    // (mis. MailAuthenticationException pas OTP register gagal kirim). Sebelumnya di-map ke
+    // 404 - salah kaprah, bikin error server-side (SMTP gagal auth, dst) nyamar jadi "resource
+    // gak ketemu" di sisi client. 500 lebih bener secara semantik: ini genuinely unexpected
+    // server error, bukan client salah alamat/ID.
     @ExceptionHandler(RuntimeException.class)
     public ResponseEntity<Map<String, Object>> handleRuntimeException(RuntimeException e) {
-        return build(HttpStatus.NOT_FOUND, e.getMessage());
+        return build(HttpStatus.INTERNAL_SERVER_ERROR, e.getMessage());
     }
 
         @ExceptionHandler(UsernameNotFoundException.class)

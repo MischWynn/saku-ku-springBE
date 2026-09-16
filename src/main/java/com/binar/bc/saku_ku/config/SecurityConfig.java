@@ -54,6 +54,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/v1/customer/verify-otp").permitAll()
                         .requestMatchers("/api/v1/customer/resend-otp").permitAll()
                         .requestMatchers("/api/v1/customer/forgot-password").permitAll()
+                        .requestMatchers("/api/v1/customer/verify-reset-otp").permitAll()
                         .requestMatchers("/api/v1/customer/reset-password").permitAll()
 
                         // rule spesifik /me HARUS di atas anyRequest().authenticated() — tanpa ini,
@@ -63,6 +64,8 @@ public class SecurityConfig {
                         .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/customer/me")
                                 .hasRole("CUSTOMER")
                         .requestMatchers(org.springframework.http.HttpMethod.PATCH, "/api/v1/customer/me")
+                                .hasRole("CUSTOMER")
+                        .requestMatchers(org.springframework.http.HttpMethod.PATCH, "/api/v1/customer/change-password")
                                 .hasRole("CUSTOMER")
 
                         // "/me" HARUS di atas wildcard "/pengajuan/**" di bawah - kebalik sebelumnya

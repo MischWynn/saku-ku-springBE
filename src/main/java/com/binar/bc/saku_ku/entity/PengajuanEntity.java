@@ -50,6 +50,12 @@ public class PengajuanEntity {
     @Column(name = "tanggal_pengajuan", insertable = false, updatable = false)
     private LocalDateTime tanggalPengajuan;
 
+    // Nullable - diisi PengajuanService.disburse() pas status pindah ke DISBURSED. Data lama
+    // (pengajuan yang udah DISBURSED sebelum kolom ini ada) tetap null - dipakai Android buat
+    // ngitung jatuh tempo tagihan (fitur Bayar/Tagihan, informational-only).
+    @Column(name = "tanggal_pencairan")
+    private LocalDateTime tanggalPencairan;
+
     @Column(name = "created_at", insertable = false, updatable = false)
     private LocalDateTime createdAt;
 

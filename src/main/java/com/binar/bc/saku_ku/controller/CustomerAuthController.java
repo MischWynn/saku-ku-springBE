@@ -2,6 +2,7 @@ package com.binar.bc.saku_ku.controller;
 
 import com.binar.bc.saku_ku.dto.ApiResponse;
 import com.binar.bc.saku_ku.dto.AuthResponseDTO;
+import com.binar.bc.saku_ku.dto.CustomerChangePasswordRequest;
 import com.binar.bc.saku_ku.dto.CustomerForgotPasswordRequest;
 import com.binar.bc.saku_ku.dto.CustomerLoginRequest;
 import com.binar.bc.saku_ku.dto.CustomerRegisterRequest;
@@ -59,10 +60,25 @@ public class CustomerAuthController {
         return ApiResponse.success(null, "Kode OTP untuk reset password sudah dikirim ke email Anda");
     }
 
+    @PostMapping("/verify-reset-otp")
+    public ApiResponse<String> verifyResetOtp(@Valid @RequestBody VerifyOtpRequest request) {
+        customerAuthService.checkResetPasswordOtp(request);
+        return ApiResponse.success(null, "Kode OTP valid");
+    }
+
     @PostMapping("/reset-password")
     public ApiResponse<String> resetPassword(@Valid @RequestBody CustomerResetPasswordRequest request) {
         customerAuthService.resetPassword(request);
         return ApiResponse.success(null, "Password berhasil direset");
+    }
+
+    @PatchMapping("/change-password")
+    public ApiResponse<String> changePassword(
+            @AuthenticationPrincipal AppCustomerEntity currentCustomer,
+            @Valid @RequestBody CustomerChangePasswordRequest request
+    ) {
+        customerAuthService.changePassword(currentCustomer.getId(), request);
+        return ApiResponse.success(null, "Password berhasil diubah");
     }
 
     @GetMapping("/me")

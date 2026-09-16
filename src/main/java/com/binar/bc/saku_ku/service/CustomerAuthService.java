@@ -1,6 +1,7 @@
 package com.binar.bc.saku_ku.service;
 
 import com.binar.bc.saku_ku.dto.AuthResponseDTO;
+import com.binar.bc.saku_ku.dto.CustomerChangePasswordRequest;
 import com.binar.bc.saku_ku.dto.CustomerForgotPasswordRequest;
 import com.binar.bc.saku_ku.dto.CustomerLoginRequest;
 import com.binar.bc.saku_ku.dto.CustomerRegisterRequest;
@@ -117,6 +118,16 @@ public class CustomerAuthService {
         otpService.generateAndSend(customer.getEmail(), PURPOSE_REGISTER_VERIFY);
     }
 
+    // Cek doang, gak konsumsi kode - dipakai layar Verifikasi OTP alur reset-password biar
+    // gak bisa lanjut ke Ganti Password pakai kode asal-asalan. Konsumsi sebenarnya (used=true)
+    // tetap di resetPassword() pas submit password baru.
+    public void checkResetPasswordOtp(VerifyOtpRequest request) {
+        boolean valid = otpService.isValid(request.getEmail(), PURPOSE_PASSWORD_RESET, request.getCode());
+        if (!valid) {
+            throw new BusinessRuleException("Kode OTP salah atau sudah kadaluarsa");
+        }
+    }
+
     public void forgotPassword(CustomerForgotPasswordRequest request) {
         // Tetap cek dulu emailnya beneran terdaftar, biar nggak generate OTP buat email random
         // (pola sama kayak UserManagementService.requestForgotPassword versi staff).
@@ -130,6 +141,22 @@ public class CustomerAuthService {
 
         CustomerEntity customer = customerRepository.findByEmail(request.getEmail())
                 .orElseThrow(() -> new BusinessRuleException("Customer tidak ditemukan"));
+        customer.setPasswordHash(passwordEncoder.encode(request.getNewPassword()));
+        customerRepository.save(customer);
+    }
+
+    // Ganti password saat udah login - beda dari forgot/reset-password (OTP-based, gak perlu
+    // tau password lama). Pola sama persis kayak UserManagementService.changePassword() punya
+    // staff: verifikasi password lama dulu sebelum encode yang baru, gak ada endpoint ini
+    // sebelumnya buat customer.
+    public void changePassword(UUID customerId, CustomerChangePasswordRequest request) {
+        CustomerEntity customer = customerRepository.findById(customerId)
+                .orElseThrow(() -> new BusinessRuleException("Customer tidak ditemukan"));
+
+        if (!passwordEncoder.matches(request.getOldPassword(), customer.getPasswordHash())) {
+            throw new UnauthorizedException("Password lama salah");
+        }
+
         customer.setPasswordHash(passwordEncoder.encode(request.getNewPassword()));
         customerRepository.save(customer);
     }

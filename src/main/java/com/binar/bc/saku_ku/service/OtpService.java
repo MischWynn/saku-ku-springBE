@@ -48,6 +48,18 @@ public class OtpService {
         otpRepository.save(otp);
     }
 
+    // Cek validitas doang, TIDAK nandain used - dipakai di alur reset-password: layar
+    // Verifikasi perlu mastiin kode bener SEBELUM lanjut ke layar Ganti Password, tapi
+    // konsumsi kode yang sebenarnya (used=true) tetap kejadian sekali di verify() pas
+    // reset-password beneran di-submit (bareng password baru). Kalau di sini juga manggil
+    // verify() yang nandain used, submit password baru bakal ditolak "kode udah kepake".
+    @Transactional(readOnly = true)
+    public boolean isValid(String email, String purpose, String code) {
+        return otpRepository
+                .findByEmailAndPurposeAndCodeAndUsedFalseAndExpiresAtAfter(email, purpose, code, LocalDateTime.now())
+                .isPresent();
+    }
+
     private String generateCode() {
         int number = RANDOM.nextInt(1_000_000);
         return String.format("%06d", number);
