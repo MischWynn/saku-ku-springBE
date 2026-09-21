@@ -20,7 +20,12 @@ jobs:
         run: docker build -t sakuku-backend:latest .
 
       - name: Save image to tar
-        run: docker save -o sakuku-backend.tar sakuku-backend:latest
+        run: |
+          docker save -o sakuku-backend.tar sakuku-backend:latest
+          # docker save writes the tar as owner-read-only (0600). The scp-action step
+          # below reads this file from inside its own container as a different user,
+          # so without this it fails with "tar: can't open ...: Permission denied".
+          chmod 644 sakuku-backend.tar
 
       # SOP A.5-A.6, tapi sekalian docker-compose.yml biar VM selalu pegang versi terbaru file
       # itu juga - gak perlu upload manual tiap kali compose-nya berubah.
