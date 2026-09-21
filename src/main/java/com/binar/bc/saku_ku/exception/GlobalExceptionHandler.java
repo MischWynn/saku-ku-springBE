@@ -7,6 +7,7 @@ import io.jsonwebtoken.SignatureException;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
@@ -60,6 +61,16 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     @ExceptionHandler(BusinessRuleException.class)
     public ResponseEntity<Map<String, Object>> handleBusinessRuleException(BusinessRuleException e) {
         return build(HttpStatus.UNPROCESSABLE_CONTENT, e.getMessage());
+    }
+
+    // DataIntegrityViolationException.getMessage() includes the raw SQL + bind values + DB
+    // error detail (Hibernate/Postgres nests the whole failed statement in there) - letting the
+    // generic RuntimeException handler below pass that straight to e.getMessage() would leak
+    // table/column names and row data to the client. Caught separately here on purpose, with a
+    // message that doesn't repeat what went wrong at the SQL level.
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    public ResponseEntity<Map<String, Object>> handleDataIntegrityViolation(DataIntegrityViolationException e) {
+        return build(HttpStatus.UNPROCESSABLE_CONTENT, "Data tidak valid atau bentrok dengan data yang sudah ada");
     }
 
     @ExceptionHandler(RuntimeException.class)
