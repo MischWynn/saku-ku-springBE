@@ -45,7 +45,6 @@ public class JwtAuthFilter extends OncePerRequestFilter {
             throws ServletException, IOException {
 
         String header = request.getHeader(HttpHeaders.AUTHORIZATION);
-        System.out.println("=== DEBUG HEADER: [" + header + "] ===");
         if (header == null || !header.startsWith(PREFIX)) {
             filterChain.doFilter(request, response);
             return;
@@ -77,7 +76,6 @@ public class JwtAuthFilter extends OncePerRequestFilter {
             }
 
             SecurityContextHolder.getContext().setAuthentication(authentication);
-System.out.println("=== AUTH SET: " + authentication.getName() + " | AUTHORITIES: " + authentication.getAuthorities() + " ===");
         } catch (JwtException | UsernameNotFoundException | IllegalArgumentException e) {
             SecurityContextHolder.clearContext();
             unauthorizedHandler.response(response, INVALID_TOKEN);
