@@ -2,12 +2,16 @@ package com.binar.bc.saku_ku.service;
 
 import com.binar.bc.saku_ku.dto.AuthResponseDTO;
 import com.binar.bc.saku_ku.dto.CustomerChangePasswordRequest;
+import com.binar.bc.saku_ku.dto.CustomerDeleteAccountRequest;
 import com.binar.bc.saku_ku.dto.CustomerForgotPasswordRequest;
 import com.binar.bc.saku_ku.dto.CustomerLoginRequest;
 import com.binar.bc.saku_ku.dto.CustomerRegisterRequest;
 import com.binar.bc.saku_ku.dto.CustomerResetPasswordRequest;
 import com.binar.bc.saku_ku.dto.CustomerResponseDTO;
 import com.binar.bc.saku_ku.dto.CustomerUpdateRequest;
+import com.binar.bc.saku_ku.dto.FcmTokenRequest;
+import com.binar.bc.saku_ku.dto.GoogleSignInRequest;
+import com.binar.bc.saku_ku.dto.GoogleSignInResponseDTO;
 import com.binar.bc.saku_ku.dto.ResendOtpRequest;
 import com.binar.bc.saku_ku.dto.VerifyOtpRequest;
 import com.binar.bc.saku_ku.entity.AppCustomerEntity;
@@ -15,7 +19,11 @@ import com.binar.bc.saku_ku.entity.CustomerEntity;
 import com.binar.bc.saku_ku.exception.BusinessRuleException;
 import com.binar.bc.saku_ku.exception.UnauthorizedException;
 import com.binar.bc.saku_ku.repository.CustomerRepository;
+import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.auth.FirebaseAuthException;
+import com.google.firebase.auth.FirebaseToken;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -29,6 +37,7 @@ import java.util.UUID;
 @Service
 @RequiredArgsConstructor
 @Transactional
+@Slf4j
 public class CustomerAuthService {
 
     private static final String PURPOSE_REGISTER_VERIFY = "REGISTER_VERIFY";
@@ -49,7 +58,7 @@ public class CustomerAuthService {
         if (customerRepository.existsByNoHp(request.getNoHp())) {
             throw new BusinessRuleException("Nomor HP sudah terdaftar");
         }
-        if (customerRepository.existsByNik(request.getNik())) {
+        if (request.getNik() != null && customerRepository.existsByNik(request.getNik())) {
             throw new BusinessRuleException("NIK sudah terdaftar");
         }
 
@@ -61,7 +70,6 @@ public class CustomerAuthService {
         customer.setAlamat(request.getAlamat());
         customer.setPasswordHash(passwordEncoder.encode(request.getPassword()));
         customer.setPlafond(BigDecimal.ZERO);
-        // Akun baru MENUNGGU verifikasi OTP dulu sebelum bisa login — lihat check di login().
         customer.setStatus("PENDING_VERIFICATION");
         customer.setTanggalLahir(request.getTanggalLahir());
         customer.setTipePekerjaan(request.getTipePekerjaan());
@@ -69,6 +77,12 @@ public class CustomerAuthService {
         customer.setLamaBekerjaBulan(request.getLamaBekerjaBulan());
         customer.setPendapatanBulanan(request.getPendapatanBulanan());
         customer.setUtangBerjalan(request.getUtangBerjalan());
+        customer.setProvinsi(request.getProvinsi());
+        customer.setKota(request.getKota());
+        customer.setKecamatan(request.getKecamatan());
+        customer.setNamaBank(request.getNamaBank());
+        customer.setNomorRekening(request.getNomorRekening());
+        customer.setNamaPemilikRekening(request.getNamaPemilikRekening());
 
         CustomerEntity saved = customerRepository.save(customer);
         userPlafondService.calculateAndAssign(saved);
@@ -91,12 +105,48 @@ public class CustomerAuthService {
         // AppCustomerEntity (principal) gak bawa status — cek langsung ke entity aslinya.
         CustomerEntity fullCustomer = customerRepository.findById(customer.getId())
                 .orElseThrow(() -> new UnauthorizedException("Email/No HP atau password salah"));
+        if (fullCustomer.getDeletedDate() != null) {
+            throw new UnauthorizedException("Email/No HP atau password salah");
+        }
         if (!"ACTIVE".equals(fullCustomer.getStatus())) {
             throw new UnauthorizedException("Akun belum diverifikasi. Cek email Anda untuk kode OTP, atau minta kode baru.");
         }
 
         String token = jwtService.issue(customer.getUsername(), customer.getRole(), Instant.now());
         return ResponseEntity.ok(new AuthResponseDTO(token));
+    }
+
+    //Ini buat id token dari google sign in, nanti di android dikirim ke backend buat di verifikasi pakai firebase admin sdk. Kalau valid, backend bikin JWT baru buat customer ini dan dikirim balik ke android.
+    // Kalau email belum ada di database, backend kirim balik response "needs registration" biasanya Android langsung arahkan user ke Register step 1 (email dikunci, prefilled dari sini).
+    public GoogleSignInResponseDTO googleSignIn(GoogleSignInRequest request) {
+        FirebaseToken decoded;
+        try {
+            decoded = FirebaseAuth.getInstance().verifyIdToken(request.getIdToken());
+        } catch (FirebaseAuthException e) {
+            log.warn("Google sign-in ditolak - token tidak valid: {}", e.getMessage());
+            throw new UnauthorizedException("Token Google tidak valid atau sudah kedaluwarsa");
+        }
+
+        String email = decoded.getEmail();
+        if (email == null || email.isBlank()) {
+            throw new BusinessRuleException("Akun Google tidak memiliki email terverifikasi");
+        }
+        String name = decoded.getName();
+
+        Optional<CustomerEntity> existing = customerRepository.findByEmail(email);
+        if (existing.isEmpty()) {
+            return GoogleSignInResponseDTO.needsRegistration(email, name);
+        }
+
+        CustomerEntity customer = existing.get();
+        if (customer.getDeletedDate() != null || !"ACTIVE".equals(customer.getStatus())) {
+            throw new UnauthorizedException("Akun belum aktif. Cek email Anda untuk kode OTP, atau minta kode baru.");
+        }
+
+        AppCustomerEntity appCustomer = appCustomerDetailsService.findCustomer(email)
+                .orElseThrow(() -> new UnauthorizedException("Akun tidak ditemukan"));
+        String token = jwtService.issue(appCustomer.getUsername(), appCustomer.getRole(), Instant.now());
+        return GoogleSignInResponseDTO.loggedIn(token, email, customer.getNamaLengkap());
     }
 
     public CustomerResponseDTO verifyRegistrationOtp(VerifyOtpRequest request) {
@@ -118,9 +168,7 @@ public class CustomerAuthService {
         otpService.generateAndSend(customer.getEmail(), PURPOSE_REGISTER_VERIFY);
     }
 
-    // Cek doang, gak konsumsi kode - dipakai layar Verifikasi OTP alur reset-password biar
-    // gak bisa lanjut ke Ganti Password pakai kode asal-asalan. Konsumsi sebenarnya (used=true)
-    // tetap di resetPassword() pas submit password baru.
+    // OTP-based password reset flow: Android kirim email, backend generate OTP & kirim ke email itu. Android kirim balik email+OTP+newPassword, backend verifikasi OTP dan update password. Pola sama kayak UserManagementService.requestForgotPassword() + resetPassword() punya staff.
     public void checkResetPasswordOtp(VerifyOtpRequest request) {
         boolean valid = otpService.isValid(request.getEmail(), PURPOSE_PASSWORD_RESET, request.getCode());
         if (!valid) {
@@ -128,9 +176,8 @@ public class CustomerAuthService {
         }
     }
 
+    // dicek dulu emailnya ada apa engga di customerrepository, kalau ada generate OTP baru dan kirim ke email itu. Kalau emailnya ga ada, throw exception "Email tidak ditemukan" (bukan silent fail) biar Android bisa kasih feedback ke user.
     public void forgotPassword(CustomerForgotPasswordRequest request) {
-        // Tetap cek dulu emailnya beneran terdaftar, biar nggak generate OTP buat email random
-        // (pola sama kayak UserManagementService.requestForgotPassword versi staff).
         customerRepository.findByEmail(request.getEmail())
                 .orElseThrow(() -> new BusinessRuleException("Email tidak ditemukan"));
         otpService.generateAndSend(request.getEmail(), PURPOSE_PASSWORD_RESET);
@@ -145,10 +192,7 @@ public class CustomerAuthService {
         customerRepository.save(customer);
     }
 
-    // Ganti password saat udah login - beda dari forgot/reset-password (OTP-based, gak perlu
-    // tau password lama). Pola sama persis kayak UserManagementService.changePassword() punya
-    // staff: verifikasi password lama dulu sebelum encode yang baru, gak ada endpoint ini
-    // sebelumnya buat customer.
+    // ini ubah password, tapi harus login dulu (ada JWT) biar bisa ubah password sendiri. Kalau lupa password, pakai forgotPassword() + resetPassword() di atas.
     public void changePassword(UUID customerId, CustomerChangePasswordRequest request) {
         CustomerEntity customer = customerRepository.findById(customerId)
                 .orElseThrow(() -> new BusinessRuleException("Customer tidak ditemukan"));
@@ -170,11 +214,8 @@ public class CustomerAuthService {
         return dto;
     }
 
-    // Partial update — field null berarti gak diubah, pola sama kayak UpdateUserRequest (staff).
-    // Sengaja TIDAK recalculate plafond otomatis di sini walau pendapatan/pekerjaan bisa berubah —
-    // UserPlafondService.calculateAndAssign() selalu INSERT baris baru, bukan update in-place,
-    // jadi manggil ulang di sini bakal bikin duplikat UserPlafondEntity per customer. Recalculation
-    // yang benar butuh method baru (find-or-update), sengaja di luar scope perubahan ini.
+
+    // ini update profil tidak semuanya pakai patch. tidak ada recalculate otomatis disini walau pekerjaannya berubah. 
     public CustomerResponseDTO updateOwnProfile(UUID customerId, CustomerUpdateRequest request) {
         CustomerEntity customer = customerRepository.findById(customerId)
                 .orElseThrow(() -> new BusinessRuleException("Customer tidak ditemukan"));
@@ -195,6 +236,16 @@ public class CustomerAuthService {
             customer.setNoHp(request.getNoHp());
         }
 
+        if (request.getNik() != null) {
+            if (customer.getNik() != null) {
+                throw new BusinessRuleException("NIK sudah diisi dan tidak bisa diubah");
+            }
+            if (customerRepository.existsByNik(request.getNik())) {
+                throw new BusinessRuleException("NIK sudah terdaftar");
+            }
+            customer.setNik(request.getNik());
+        }
+
         if (request.getAlamat() != null) customer.setAlamat(request.getAlamat());
         if (request.getTanggalLahir() != null) customer.setTanggalLahir(request.getTanggalLahir());
         if (request.getTipePekerjaan() != null) customer.setTipePekerjaan(request.getTipePekerjaan());
@@ -203,10 +254,53 @@ public class CustomerAuthService {
         if (request.getPendapatanBulanan() != null) customer.setPendapatanBulanan(request.getPendapatanBulanan());
         if (request.getUtangBerjalan() != null) customer.setUtangBerjalan(request.getUtangBerjalan());
 
+        // Data pekerjaan (untuk pendapatan) dipidnahin ke step terakhir di register() biar Android bisa kirim data pekerjaan belakangan (step 3) tanpa bikin plafon salah hitung. Jadi kalau user update profil di step 1/2, plafon TIDAK dihitung ulang di sini. Kalau user update data pekerjaan (step 3), plafon dihitung ulang di titik itu (userPlafondService.recalculate()).
+        if (request.getPendapatanBulanan() != null) {
+            userPlafondService.recalculate(customer);
+        }
+        if (request.getFotoKtp() != null) customer.setFotoKtp(request.getFotoKtp());
+        if (request.getProvinsi() != null) customer.setProvinsi(request.getProvinsi());
+        if (request.getKota() != null) customer.setKota(request.getKota());
+        if (request.getKecamatan() != null) customer.setKecamatan(request.getKecamatan());
+        if (request.getNamaBank() != null) customer.setNamaBank(request.getNamaBank());
+        if (request.getNomorRekening() != null) customer.setNomorRekening(request.getNomorRekening());
+        if (request.getNamaPemilikRekening() != null) customer.setNamaPemilikRekening(request.getNamaPemilikRekening());
+
         CustomerEntity saved = customerRepository.save(customer);
         CustomerResponseDTO dto = CustomerResponseDTO.from(saved);
         dto.setSisaPlafond(pengajuanService.getSisaPlafond(saved));
         dto.setTierPlafond(userPlafondService.getTierName(saved));
         return dto;
+    }
+
+
+    // Self-service delete, Android Profil -> "Hapus Akun". Soft-delete (deletedDate), row TETAP ada di DB (riwayat pengajuan customer ini gak boleh ikut rusak/kehilangan referensi) - tapi nik/email/no_hp di-scramble biar slot unique constraint-nya kebebasin, customer boleh daftar ulang pakai NIK/email yang sama kapan aja setelah ini, sesuai keputusan user.
+    public void deleteOwnAccount(UUID customerId, CustomerDeleteAccountRequest request) {
+        CustomerEntity customer = customerRepository.findById(customerId)
+                .orElseThrow(() -> new BusinessRuleException("Customer tidak ditemukan"));
+
+        if (!passwordEncoder.matches(request.getPassword(), customer.getPasswordHash())) {
+            throw new UnauthorizedException("Password salah");
+        }
+        if (customer.getDeletedDate() != null) {
+            throw new BusinessRuleException("Akun sudah dihapus");
+        }
+
+        // Turunan dari UUID customer sendiri - deterministik & dijamin gak collide sama customer lain yang juga dihapus, dipotong sesuai panjang kolom masing-masing (nik VARCHAR(16), no_hp VARCHAR(20)).
+        String hex = customer.getId().toString().replace("-", "");
+        customer.setNik(("DEL" + hex).substring(0, 16));
+        customer.setNoHp(("DEL" + hex).substring(0, 20));
+        customer.setEmail("del-" + hex + "@deleted.sakuku.local");
+        customer.setDeletedDate(java.time.LocalDateTime.now());
+
+        customerRepository.save(customer);
+    }
+
+    // ini dipakai untuk update FCM token di database, biar backend bisa push notification ke device user. Dipanggil Android abis login sukses / dapet FCM token baru dari sistem (onRegistered). Endpoint terpisah dari PATCH customer/me sengaja - ini side-effect device, bukan data profil yang diedit user, jadi Android bisa panggil ini diem-diem di background tanpa lewat form apa pun. Overwrite polos (bukan partial-update dgn null-check) - token lama otomatis kegantiin kalau install ulang/ganti device.
+    public void updateFcmToken(UUID customerId, FcmTokenRequest request) {
+        CustomerEntity customer = customerRepository.findById(customerId)
+                .orElseThrow(() -> new BusinessRuleException("Customer tidak ditemukan"));
+        customer.setFcmToken(request.getFcmToken());
+        customerRepository.save(customer);
     }
 }

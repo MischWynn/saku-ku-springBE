@@ -1,0 +1,41 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: sakuku-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: binar_finance
+      POSTGRES_USER: ${DB_USERNAME}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - sakuku-db-data:/var/lib/postgresql/data
+    networks:
+      - sakuku-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME} -d binar_finance"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    image: sakuku-backend:latest
+    container_name: sakuku-backend
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      DB_URL: jdbc:postgresql://db:5432/binar_finance
+    ports:
+      - "8080:8080"
+    networks:
+      - sakuku-net
+
+networks:
+  sakuku-net:
+    driver: bridge
+
+volumes:
+  sakuku-db-data:

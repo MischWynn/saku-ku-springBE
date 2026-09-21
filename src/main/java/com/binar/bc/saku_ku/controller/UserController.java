@@ -9,11 +9,14 @@ import com.binar.bc.saku_ku.entity.AppUserEntity;
 import com.binar.bc.saku_ku.entity.UserEntity;
 import com.binar.bc.saku_ku.repository.UserRepository;
 import com.binar.bc.saku_ku.exception.UnauthorizedException;
+import com.binar.bc.saku_ku.service.TokenBlacklistService;
 import com.binar.bc.saku_ku.service.UserManagementService;
 import com.binar.bc.saku_ku.service.UserService;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -30,6 +33,15 @@ public class UserController {
     private final UserService userService;
     private final UserRepository userRepository;
     private final UserManagementService userManagementService;
+    private final TokenBlacklistService tokenBlacklistService;
+
+    // POST /api/v1/user/logout - blacklist token JWT yang lagi dipakai di Redis, sisa umurnya
+    // (bukan cuma clear localStorage di browser) - lihat TokenBlacklistService buat alasannya.
+    @PostMapping("/logout")
+    public ApiResponse<String> logout(HttpServletRequest request) {
+        tokenBlacklistService.blacklistFromHeader(request.getHeader(HttpHeaders.AUTHORIZATION));
+        return ApiResponse.success(null, "Logout berhasil");
+    }
 
     //PATCH UPDATE /api/v1/user/me
     @PatchMapping("/me")

@@ -45,12 +45,16 @@ public class SecurityConfig {
                                 .maxAgeInSeconds(31536000))
                         .frameOptions(frameOptionsConfig -> frameOptionsConfig.deny()))
                 .authorizeHttpRequests(request -> request
+                        // Swagger UI + the generated OpenAPI spec it reads from - has to be
+                        // reachable without a token, otherwise nobody can even open the docs page.
+                        .requestMatchers("/swagger-ui/**", "/swagger-ui.html", "/v3/api-docs/**").permitAll()
                         .requestMatchers("/api/v1/auth/**").permitAll()
                         .requestMatchers("/api/v1/user/login").permitAll()
                         .requestMatchers("/api/v1/user/forgot-password").permitAll()
                         .requestMatchers("/api/v1/user/reset-password").permitAll()
                         .requestMatchers("/api/v1/customer/register").permitAll()
                         .requestMatchers("/api/v1/customer/login").permitAll()
+                        .requestMatchers("/api/v1/customer/google-signin").permitAll()
                         .requestMatchers("/api/v1/customer/verify-otp").permitAll()
                         .requestMatchers("/api/v1/customer/resend-otp").permitAll()
                         .requestMatchers("/api/v1/customer/forgot-password").permitAll()
@@ -65,7 +69,11 @@ public class SecurityConfig {
                                 .hasRole("CUSTOMER")
                         .requestMatchers(org.springframework.http.HttpMethod.PATCH, "/api/v1/customer/me")
                                 .hasRole("CUSTOMER")
+                        .requestMatchers(org.springframework.http.HttpMethod.DELETE, "/api/v1/customer/me")
+                                .hasRole("CUSTOMER")
                         .requestMatchers(org.springframework.http.HttpMethod.PATCH, "/api/v1/customer/change-password")
+                                .hasRole("CUSTOMER")
+                        .requestMatchers(org.springframework.http.HttpMethod.PATCH, "/api/v1/customer/fcm-token")
                                 .hasRole("CUSTOMER")
 
                         // "/me" HARUS di atas wildcard "/pengajuan/**" di bawah - kebalik sebelumnya

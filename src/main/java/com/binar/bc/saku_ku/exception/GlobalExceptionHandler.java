@@ -2,21 +2,44 @@ package com.binar.bc.saku_ku.exception;
 
 import java.time.Instant;
 import java.util.Map;
+import java.util.stream.Collectors;
 import io.jsonwebtoken.SignatureException;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
+import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.context.request.WebRequest;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
 
 import jakarta.persistence.EntityNotFoundException;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
-    
+
     public static final String REQUIRED_AUTHENTICATION_MESSAGE = "Unauthorized access: Authentication required";
+
+    // Sebelum ini, kegagalan @Valid (field kosong/salah format dkk) jatuh ke default bawaan
+    // ResponseEntityExceptionHandler (bentuk ProblemDetail RFC 7807) - beda total sama bentuk
+    // {timestamp,status,error,message} yang dipakai semua exception lain di file ini. Override
+    // ini nyamain bentuknya, jadi SEMUA 400 di API ini punya 1 bentuk konsisten - juga berarti
+    // dokumentasi Swagger buat "400" akhirnya beneran akurat buat endpoint POST/PATCH manapun.
+    @Override
+    protected ResponseEntity<Object> handleMethodArgumentNotValid(
+            MethodArgumentNotValidException ex,
+            HttpHeaders headers,
+            HttpStatusCode status,
+            WebRequest request) {
+        String message = ex.getBindingResult().getFieldErrors().stream()
+                .map(fe -> fe.getField() + ": " + fe.getDefaultMessage())
+                .collect(Collectors.joining(", "));
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(body(HttpStatus.BAD_REQUEST, message.isBlank() ? "Input tidak valid" : message));
+    }
 
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<Map<String, Object>> illegalArgument 
@@ -39,11 +62,6 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         return build(HttpStatus.UNPROCESSABLE_CONTENT, e.getMessage());
     }
 
-    // Catch-all buat runtime exception yang gak ke-handle handler spesifik manapun di atas
-    // (mis. MailAuthenticationException pas OTP register gagal kirim). Sebelumnya di-map ke
-    // 404 - salah kaprah, bikin error server-side (SMTP gagal auth, dst) nyamar jadi "resource
-    // gak ketemu" di sisi client. 500 lebih bener secara semantik: ini genuinely unexpected
-    // server error, bukan client salah alamat/ID.
     @ExceptionHandler(RuntimeException.class)
     public ResponseEntity<Map<String, Object>> handleRuntimeException(RuntimeException e) {
         return build(HttpStatus.INTERNAL_SERVER_ERROR, e.getMessage());

@@ -32,3 +32,24 @@ build/
 ### VS Code ###
 .vscode/
 .env
+
+### Firebase ###
+# Service-account key buat FCM (Firebase Admin SDK) - kredensial sensitif, JANGAN pernah commit.
+firebase-service-account.json
+
+#### OS ###
+.DS_Store
+
+### Logs ###
+backend-clean-err.log
+backend-clean.log
+backend-fcm-err.log
+backend-fcm.log
+backend-fcm3-err.log
+backend-fcm3.log
+backend-restart-err.log
+backend-restart.log
+
+##DOCKER##
+sakuku-backed.tar
+*.tar

@@ -17,8 +17,9 @@ import java.util.UUID;
 public class NotificationService {
 
     private final NotificationRepository notificationRepository;
+    private final PushNotificationService pushNotificationService;
 
-    // Dipanggil otomatis dari PengajuanService tiap kali status berubah
+    // ini buat bikin notifikasi baru, dipanggil dari service lain (misal: pengajuanService) pas ada event yang butuh notifikasi ke customer. Notifikasi disimpan di DB + dikirim ke device via FCM.
     @Transactional
     public void create(CustomerEntity customer, PengajuanEntity pengajuan, String judul, String pesan) {
         NotificationEntity notif = new NotificationEntity();
@@ -29,6 +30,9 @@ public class NotificationService {
         notif.setIsRead(false);
 
         notificationRepository.save(notif);
+
+        String pengajuanId = pengajuan != null ? pengajuan.getId().toString() : null;
+        pushNotificationService.send(customer, judul, pesan, pengajuanId);
     }
 
     @Transactional(readOnly = true)

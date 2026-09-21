@@ -36,7 +36,6 @@ public class UserManagementService {
                 .orElseThrow(() -> new BusinessRuleException("Email not found"));
 
         return jwtService.issueResetToken(request.getEmail(), Instant.now());
-        // tidak ada userRepository.save() sama sekali di sini!
     }
 
     public void resetPassword(ResetPasswordRequest request) {

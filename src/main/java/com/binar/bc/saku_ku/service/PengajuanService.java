@@ -13,8 +13,6 @@ import com.binar.bc.saku_ku.repository.CustomerRepository;
 import com.binar.bc.saku_ku.repository.PengajuanRepository;
 import com.binar.bc.saku_ku.repository.UserPlafondRepository;
 import com.binar.bc.saku_ku.repository.UserRepository;
-import com.binar.bc.saku_ku.service.NotificationService;
-
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -52,10 +50,6 @@ public class PengajuanService {
             throw new BusinessRuleException("Tenor yang dipilih sedang tidak aktif");
         }
 
-        // Plafond check — bukan cuma vs limit TOTAL, tapi vs SISA (limit dikurangi yang udah
-        // "ketahan" oleh pengajuan lain yang masih di pipeline review atau udah DISBURSED).
-        // Sebelum ini, customer bisa apply berkali-kali sampai ngelebihin limit gabungan
-        // (masing-masing pengajuan cuma dicek < limit total sendiri-sendiri) — dibenerin 13 Sept 2026.
         BigDecimal effectiveLimit = getEffectiveLimit(customer);
         if (effectiveLimit != null) {
             BigDecimal heldNominal = pengajuanRepository.sumHeldNominalByCustomer(customer.getId());
@@ -71,11 +65,12 @@ public class PengajuanService {
         pengajuan.setCustomer(customer);
         pengajuan.setBungaTenor(bungaTenor);
         pengajuan.setNominalPengajuan(request.getNominalPengajuan());
-        // snapshot, bukan reference dinamis
         pengajuan.setTenor(bungaTenor.getTenor());
         pengajuan.setInterestRate(bungaTenor.getInterestRate());
         pengajuan.setTujuanPinjaman(request.getTujuanPinjaman());
-        pengajuan.setStatus("MARKETING_REVIEW"); // langsung skip SUBMITTED
+        pengajuan.setCreatedAt(LocalDateTime.now());
+        pengajuan.setUpdatedAt(LocalDateTime.now());
+        pengajuan.setStatus("MARKETING_REVIEW");
 
         return pengajuanRepository.save(pengajuan);
     }
@@ -99,7 +94,6 @@ public class PengajuanService {
         return pengajuanRepository.findAll();
     }
 
-    // ==== MARKETING actions ====
 
     @Transactional
     public PengajuanEntity marketingApprove(UUID id, String currentUsername, PengajuanReviewRequest request) {

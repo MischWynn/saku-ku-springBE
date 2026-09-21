@@ -1,0 +1,72 @@
+name: Deploy Backend to GCP VM
+
+# Jalan otomatis tiap push ke main, atau bisa dipicu manual dari tab Actions di GitHub
+# ("Run workflow") kalau butuh re-deploy tanpa commit baru.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # Sama persis 3 langkah manual di SOP (A.2-A.3): build image, save jadi tar. GitHub-hosted
+      # runner udah ada Docker terpasang, gak butuh setup tambahan.
+      - name: Build Docker image
+        run: docker build -t sakuku-backend:latest .
+
+      - name: Save image to tar
+        run: docker save -o sakuku-backend.tar sakuku-backend:latest
+
+      # SOP A.5-A.6, tapi sekalian docker-compose.yml biar VM selalu pegang versi terbaru file
+      # itu juga - gak perlu upload manual tiap kali compose-nya berubah.
+      - name: Copy image + compose file to VM (staging folder)
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.GCP_VM_HOST }}
+          username: ${{ secrets.GCP_VM_USERNAME }}
+          key: ${{ secrets.GCP_VM_SSH_KEY }}
+          source: "sakuku-backend.tar,docker-compose.yml"
+          target: /home/${{ secrets.GCP_VM_USERNAME }}/incoming
+
+      # SOP B.1-B.4, otomatis: load image, swap CUMA container backend (--no-deps), verifikasi
+      # beneran nyala (bukan cuma "command jalan tanpa error"), lalu bersih-bersih.
+      - name: Load image, swap backend container, verify, clean up
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.GCP_VM_HOST }}
+          username: ${{ secrets.GCP_VM_USERNAME }}
+          key: ${{ secrets.GCP_VM_SSH_KEY }}
+          script: |
+            set -e
+            mkdir -p ~/sakuku
+            mv ~/incoming/docker-compose.yml ~/sakuku/docker-compose.yml
+            mv ~/incoming/sakuku-backend.tar ~/sakuku/sakuku-backend.tar
+            cd ~/sakuku
+
+            docker load < sakuku-backend.tar
+            rm sakuku-backend.tar
+
+            # --no-deps: recreate ONLY "backend". Never touches "db" (has real migrated data,
+            # restarting it is harmless anyway since it's a named volume, but no reason to) and
+            # never touches the separately-managed cloudflared tunnel container, which isn't
+            # part of this compose project at all - see the note in docker-compose.yml.
+            docker compose up -d --no-deps --force-recreate backend
+
+            # Old image is now dangling (same tag, new content) - clean it up so disk doesn't
+            # fill up over repeated deploys. This is the automated equivalent of the SOP's
+            # reminder to `docker rmi`/`docker rm` old stuff by hand.
+            docker image prune -f
+
+            sleep 5
+            RUNNING=$(docker inspect -f '{{.State.Running}}' sakuku-backend 2>/dev/null || echo false)
+            if [ "$RUNNING" != "true" ]; then
+              echo "::error::sakuku-backend did not stay running after deploy"
+              docker logs --tail 100 sakuku-backend || true
+              exit 1
+            fi
+            docker logs --tail 50 sakuku-backend

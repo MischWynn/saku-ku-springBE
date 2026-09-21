@@ -16,7 +16,6 @@ public class CustomerRegisterRequest {
     @NotBlank(message = "Full name cannot be empty")
     private String namaLengkap;
 
-    @NotBlank(message = "NIK cannot be empty")
     @Pattern(regexp = "\\d{16}", message = "NIK must be 16 digits")
     private String nik;
 
@@ -32,12 +31,18 @@ public class CustomerRegisterRequest {
     @NotBlank(message = "Password cannot be empty")
     private String password;
 
-    // Opsional dulu (Android customer app belum ada yang ngirim ini)
     private LocalDate tanggalLahir;
-    // ASN_TNI_POLRI, BUMN_BUMD, SWASTA, WIRASWASTA, NON_PROFIT, FREELANCE, TIDAK_BEKERJA
     private String tipePekerjaan;
     private String pekerjaan;
     private Integer lamaBekerjaBulan;
     private BigDecimal pendapatanBulanan;
     private BigDecimal utangBerjalan;
+
+    private String provinsi;
+    private String kota;
+    private String kecamatan;
+
+    private String namaBank;
+    private String nomorRekening;
+    private String namaPemilikRekening;
 }

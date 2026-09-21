@@ -26,12 +26,14 @@ public class CustomerResponseDTO {
     private Integer lamaBekerjaBulan;
     private BigDecimal pendapatanBulanan;
     private BigDecimal utangBerjalan;
-    // Computed, bukan kolom DB — limit dikurangi yang lagi "ketahan" di pipeline review/DISBURSED.
-    // Diisi terpisah oleh caller (lihat CustomerAuthService) karena butuh PengajuanService, DTO ini
-    // sengaja tetap murni entity mapper.
+    private String provinsi;
+    private String kota;
+    private String kecamatan;
+    private String namaBank;
+    private String nomorRekening;
+    private String namaPemilikRekening;
+    private boolean hasFotoKtp;
     private BigDecimal sisaPlafond;
-    // Computed juga — nama tier (Bronze/Silver/Gold/Platinum), bukan flat amount (lihat
-    // UserPlafondService.getTierName()). Diisi terpisah oleh caller, sama pola kayak sisaPlafond.
     private String tierPlafond;
 
     public static CustomerResponseDTO from(CustomerEntity customer) {
@@ -52,6 +54,13 @@ public class CustomerResponseDTO {
         dto.setLamaBekerjaBulan(customer.getLamaBekerjaBulan());
         dto.setPendapatanBulanan(customer.getPendapatanBulanan());
         dto.setUtangBerjalan(customer.getUtangBerjalan());
+        dto.setProvinsi(customer.getProvinsi());
+        dto.setKota(customer.getKota());
+        dto.setKecamatan(customer.getKecamatan());
+        dto.setNamaBank(customer.getNamaBank());
+        dto.setNomorRekening(customer.getNomorRekening());
+        dto.setNamaPemilikRekening(customer.getNamaPemilikRekening());
+        dto.setHasFotoKtp(customer.getFotoKtp() != null && !customer.getFotoKtp().isBlank());
         return dto;
     }
 }

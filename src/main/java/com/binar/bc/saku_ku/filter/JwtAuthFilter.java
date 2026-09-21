@@ -7,6 +7,7 @@ import com.binar.bc.saku_ku.exception.UnauthorizedHandler;
 import com.binar.bc.saku_ku.service.AppCustomerDetailsService;
 import com.binar.bc.saku_ku.service.AppUserDetailsService;
 import com.binar.bc.saku_ku.service.JwtService;
+import com.binar.bc.saku_ku.service.TokenBlacklistService;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.JwtException;
 import jakarta.servlet.FilterChain;
@@ -34,6 +35,7 @@ public class JwtAuthFilter extends OncePerRequestFilter {
     private final AppUserDetailsService appUserDetailsService;
     private final AppCustomerDetailsService appCustomerDetailsService;
     private final UnauthorizedHandler unauthorizedHandler;
+    private final TokenBlacklistService tokenBlacklistService;
 
     @Override
     protected void doFilterInternal(
@@ -49,8 +51,14 @@ public class JwtAuthFilter extends OncePerRequestFilter {
             return;
         }
 
+        String rawToken = header.substring(PREFIX.length());
+
         try {
-            Claims claims = jwtService.parse(header.substring(PREFIX.length()));
+            if (tokenBlacklistService.isBlacklisted(rawToken)) {
+                throw new UnauthorizedException(INVALID_TOKEN);
+            }
+
+            Claims claims = jwtService.parse(rawToken);
             String role = claims.get("role", String.class);
             String subject = claims.getSubject();
 

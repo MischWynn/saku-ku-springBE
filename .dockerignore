@@ -1,0 +1,23 @@
+# Never let these into the build context - stage 3 only ever COPYs the jar by name from stage 2,
+# but keeping these out entirely means they can't leak in even if the Dockerfile changes later.
+target/
+*.log
+.git/
+.gitignore
+.env
+firebase-service-account.json
+
+# IDE / editor noise - irrelevant to the build, just wasted context-transfer time.
+.idea/
+.vscode/
+*.iml
+.classpath
+.factorypath
+.project
+.settings/
+
+# Local docs/scratch files, not needed inside the image.
+HELP.md
+README.md
+db-sakuku.txt
+*.sql

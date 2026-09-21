@@ -22,7 +22,7 @@ public class UserPlafondEntity {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "id_customer", nullable = false)
-    private CustomerEntity customer; // sesuaikan nama class customer-mu
+    private CustomerEntity customer;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "id_plafond", nullable = false)
