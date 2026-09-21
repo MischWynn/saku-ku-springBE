@@ -56,6 +56,13 @@ jobs:
             docker load < sakuku-backend.tar
             rm sakuku-backend.tar
 
+            # If "sakuku-backend" exists but wasn't created by THIS compose project (e.g. it was
+            # started manually before CI/CD existed), Compose doesn't recognize it as its own and
+            # --force-recreate below can't replace it - it just collides on the name instead.
+            # Force-remove it first so the name is free either way; harmless no-op if it's already
+            # compose-managed, since --force-recreate would have removed it anyway.
+            docker rm -f sakuku-backend 2>/dev/null || true
+
             # --no-deps: recreate ONLY "backend". Never touches "db" (has real migrated data,
             # restarting it is harmless anyway since it's a named volume, but no reason to) and
             # never touches the separately-managed cloudflared tunnel container, which isn't
