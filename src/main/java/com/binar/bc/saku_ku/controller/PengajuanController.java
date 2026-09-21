@@ -14,7 +14,6 @@ import com.binar.bc.saku_ku.service.ReviewLogService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.ExampleObject;
-import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -64,11 +63,11 @@ public class PengajuanController {
     @PostMapping
     @Operation(summary = "Ajukan pinjaman baru", description = "Ditolak dengan 422 kalau nominalPengajuan melebihi sisaPlafond customer (limit total dikurangi pengajuan lain yang masih di pipeline review + yang sudah DISBURSED).")
     @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Pengajuan dibuat, status awal MARKETING_REVIEW", content = @Content(
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Pengajuan dibuat, status awal MARKETING_REVIEW", content = @Content(
                     mediaType = "application/json", examples = @ExampleObject(value = "{\"statusCode\":200,\"message\":\"Pengajuan berhasil dibuat\",\"data\":" + PENGAJUAN_EXAMPLE + "}"))),
-            @ApiResponse(responseCode = "400", description = "idBungaTenor/nominalPengajuan kosong", content = @Content(
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "idBungaTenor/nominalPengajuan kosong", content = @Content(
                     mediaType = "application/json", examples = @ExampleObject(value = SwaggerExamples.BAD_REQUEST))),
-            @ApiResponse(responseCode = "422", description = "Nominal melebihi sisa plafond", content = @Content(
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "422", description = "Nominal melebihi sisa plafond", content = @Content(
                     mediaType = "application/json",
                     examples = @ExampleObject(value = "{\"timestamp\":\"2026-09-21T10:15:30Z\",\"status\":422,\"error\":\"Unprocessable Entity\",\"message\":\"Nominal pengajuan melebihi sisa plafond Anda (Rp4.000.000)\"}")))
     })
@@ -83,9 +82,9 @@ public class PengajuanController {
     @GetMapping("/me")
     @Operation(summary = "Riwayat pengajuan milik sendiri (customer)")
     @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "OK", content = @Content(
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "OK", content = @Content(
                     mediaType = "application/json", examples = @ExampleObject(value = "{\"statusCode\":200,\"message\":\"Riwayat pengajuan berhasil diambil\",\"data\":[" + PENGAJUAN_EXAMPLE + "]}"))),
-            @ApiResponse(responseCode = "401", description = "Belum login", content = @Content(
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "Belum login", content = @Content(
                     mediaType = "application/json", examples = @ExampleObject(value = SwaggerExamples.UNAUTHORIZED_TOKEN)))
     })
     public ApiResponse<List<PengajuanEntity>> getMyPengajuan(
@@ -98,9 +97,9 @@ public class PengajuanController {
     @PatchMapping("/{id}/cancel")
     @Operation(summary = "Batalkan pengajuan sendiri (customer)")
     @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Pengajuan dibatalkan", content = @Content(
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Pengajuan dibatalkan", content = @Content(
                     mediaType = "application/json", examples = @ExampleObject(value = "{\"statusCode\":200,\"message\":\"Pengajuan berhasil dibatalkan\",\"data\":" + PENGAJUAN_EXAMPLE + "}"))),
-            @ApiResponse(responseCode = "422", description = "Pengajuan bukan milik customer ini, atau statusnya sudah tidak bisa dibatalkan", content = @Content(
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "422", description = "Pengajuan bukan milik customer ini, atau statusnya sudah tidak bisa dibatalkan", content = @Content(
                     mediaType = "application/json", examples = @ExampleObject(value = SwaggerExamples.UNPROCESSABLE_EMAIL_TAKEN)))
     })
     public ApiResponse<PengajuanEntity> cancelByCustomer(
@@ -117,10 +116,10 @@ public class PengajuanController {
     @GetMapping("/{id}/history/me")
     @Operation(summary = "Timeline review pengajuan (versi customer, terfilter)", description = "Beda dari /{id}/history (staff) - DTO ini gak bawa identitas staff internal, dan wajib cek pengajuan ini milik customer yang login.")
     @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "OK", content = @Content(
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "OK", content = @Content(
                     mediaType = "application/json",
                     examples = @ExampleObject(value = "{\"statusCode\":200,\"message\":\"Riwayat pengajuan berhasil diambil\",\"data\":[{\"action\":\"MARKETING_APPROVE\",\"statusFrom\":\"MARKETING_REVIEW\",\"statusTo\":\"BM_REVIEW\",\"catatan\":\"Dokumen lengkap\",\"roleName\":\"MARKETING\",\"createdAt\":\"2026-09-20T10:00:00\"}]}"))),
-            @ApiResponse(responseCode = "422", description = "Pengajuan ini bukan milik customer yang login", content = @Content(
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "422", description = "Pengajuan ini bukan milik customer yang login", content = @Content(
                     mediaType = "application/json",
                     examples = @ExampleObject(value = "{\"timestamp\":\"2026-09-21T10:15:30Z\",\"status\":422,\"error\":\"Unprocessable Entity\",\"message\":\"Anda tidak berhak mengakses riwayat pengajuan ini\"}")))
     })
@@ -143,9 +142,9 @@ public class PengajuanController {
     @GetMapping
     @Operation(summary = "Semua pengajuan, semua status (staff, read-only monitoring)")
     @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "OK", content = @Content(
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "OK", content = @Content(
                     mediaType = "application/json", examples = @ExampleObject(value = "{\"statusCode\":200,\"message\":\"Semua pengajuan berhasil diambil\",\"data\":[" + PENGAJUAN_EXAMPLE + "]}"))),
-            @ApiResponse(responseCode = "403", description = "Role gak punya akses (bukan staff)", content = @Content(
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "Role gak punya akses (bukan staff)", content = @Content(
                     mediaType = "application/json", examples = @ExampleObject(value = SwaggerExamples.FORBIDDEN)))
     })
     public ApiResponse<List<PengajuanEntity>> getAll() {
@@ -155,9 +154,9 @@ public class PengajuanController {
     @GetMapping("/{id}")
     @Operation(summary = "Detail 1 pengajuan (staff)")
     @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "OK", content = @Content(
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "OK", content = @Content(
                     mediaType = "application/json", examples = @ExampleObject(value = "{\"statusCode\":200,\"message\":\"Pengajuan berhasil diambil\",\"data\":" + PENGAJUAN_EXAMPLE + "}"))),
-            @ApiResponse(responseCode = "404", description = "ID tidak ditemukan", content = @Content(
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "ID tidak ditemukan", content = @Content(
                     mediaType = "application/json", examples = @ExampleObject(value = SwaggerExamples.NOT_FOUND)))
     })
     public ApiResponse<PengajuanEntity> getById(@PathVariable UUID id) {
@@ -167,7 +166,7 @@ public class PengajuanController {
     @GetMapping("/status/{status}")
     @Operation(summary = "Filter pengajuan by status (dipakai queue per role di dashboard staff)", description = "status: MARKETING_REVIEW | MARKETING_REJECTED | BM_REVIEW | BM_REJECTED | BACKOFFICE_REVIEW | DISBURSED | CANCELLED")
     @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "OK", content = @Content(
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "OK", content = @Content(
                     mediaType = "application/json", examples = @ExampleObject(value = "{\"statusCode\":200,\"message\":\"Pengajuan berhasil difilter\",\"data\":[" + PENGAJUAN_EXAMPLE + "]}")))
     })
     public ApiResponse<List<PengajuanEntity>> getByStatus(@PathVariable String status) {
@@ -179,10 +178,10 @@ public class PengajuanController {
     @PatchMapping("/{id}/marketing-approve")
     @Operation(summary = "Approve tahap Marketing", description = "Lanjut ke status BM_REVIEW.")
     @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Disetujui, lanjut ke BM", content = @Content(
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Disetujui, lanjut ke BM", content = @Content(
                     mediaType = "application/json",
                     examples = @ExampleObject(value = "{\"statusCode\":200,\"message\":\"Pengajuan disetujui Marketing\",\"data\":" + PENGAJUAN_BM_REVIEW_EXAMPLE + "}"))),
-            @ApiResponse(responseCode = "403", description = "Bukan role MARKETING", content = @Content(
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "Bukan role MARKETING", content = @Content(
                     mediaType = "application/json", examples = @ExampleObject(value = SwaggerExamples.FORBIDDEN)))
     })
     public ApiResponse<PengajuanEntity> marketingApprove(
@@ -197,10 +196,10 @@ public class PengajuanController {
     @PatchMapping("/{id}/marketing-reject")
     @Operation(summary = "Reject tahap Marketing", description = "catatan di body = alasan reject, disimpan ke ReviewLog.")
     @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Ditolak", content = @Content(
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Ditolak", content = @Content(
                     mediaType = "application/json",
                     examples = @ExampleObject(value = "{\"statusCode\":200,\"message\":\"Pengajuan ditolak Marketing\",\"data\":" + PENGAJUAN_MARKETING_REJECTED_EXAMPLE + "}"))),
-            @ApiResponse(responseCode = "403", description = "Bukan role MARKETING", content = @Content(
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "Bukan role MARKETING", content = @Content(
                     mediaType = "application/json", examples = @ExampleObject(value = SwaggerExamples.FORBIDDEN)))
     })
     public ApiResponse<PengajuanEntity> marketingReject(
@@ -217,10 +216,10 @@ public class PengajuanController {
     @PatchMapping("/{id}/bm-approve")
     @Operation(summary = "Approve tahap BM", description = "nominalDisetujui WAJIB diisi di body, dan tidak boleh lebih besar dari nominalPengajuan asli. Lanjut ke BACKOFFICE_REVIEW.")
     @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Disetujui, lanjut ke Back Office", content = @Content(
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Disetujui, lanjut ke Back Office", content = @Content(
                     mediaType = "application/json",
                     examples = @ExampleObject(value = "{\"statusCode\":200,\"message\":\"Pengajuan disetujui BM\",\"data\":" + PENGAJUAN_BACKOFFICE_REVIEW_EXAMPLE + "}"))),
-            @ApiResponse(responseCode = "400", description = "nominalDisetujui kosong atau melebihi nominalPengajuan", content = @Content(
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "nominalDisetujui kosong atau melebihi nominalPengajuan", content = @Content(
                     mediaType = "application/json",
                     examples = @ExampleObject(value = "{\"timestamp\":\"2026-09-21T10:15:30Z\",\"status\":422,\"error\":\"Unprocessable Entity\",\"message\":\"Nominal disetujui wajib diisi\"}")))
     })
@@ -236,10 +235,10 @@ public class PengajuanController {
     @PatchMapping("/{id}/bm-reject")
     @Operation(summary = "Reject tahap BM")
     @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Ditolak", content = @Content(
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Ditolak", content = @Content(
                     mediaType = "application/json",
                     examples = @ExampleObject(value = "{\"statusCode\":200,\"message\":\"Pengajuan ditolak BM\",\"data\":" + PENGAJUAN_BM_REJECTED_EXAMPLE + "}"))),
-            @ApiResponse(responseCode = "403", description = "Bukan role BM", content = @Content(
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "Bukan role BM", content = @Content(
                     mediaType = "application/json", examples = @ExampleObject(value = SwaggerExamples.FORBIDDEN)))
     })
     public ApiResponse<PengajuanEntity> bmReject(
@@ -256,9 +255,9 @@ public class PengajuanController {
     @PatchMapping("/{id}/disburse")
     @Operation(summary = "Cairkan dana (Back Office)", description = "Tidak ada endpoint reject untuk Back Office - status akhir SELALU DISBURSED. Menstempel tanggalPencairan.")
     @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Dana dicairkan", content = @Content(
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Dana dicairkan", content = @Content(
                     mediaType = "application/json", examples = @ExampleObject(value = "{\"statusCode\":200,\"message\":\"Pengajuan berhasil dicairkan\",\"data\":" + PENGAJUAN_DISBURSED_EXAMPLE + "}"))),
-            @ApiResponse(responseCode = "403", description = "Bukan role BACK_OFFICE", content = @Content(
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "Bukan role BACK_OFFICE", content = @Content(
                     mediaType = "application/json", examples = @ExampleObject(value = SwaggerExamples.FORBIDDEN)))
     })
     public ApiResponse<PengajuanEntity> disburse(
@@ -274,10 +273,10 @@ public class PengajuanController {
     @PatchMapping("/{id}/cancel-admin")
     @Operation(summary = "Force-cancel oleh superadmin", description = "Satu-satunya action state-changing yang superadmin boleh lakukan - sisanya read-only monitoring.")
     @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Dibatalkan paksa", content = @Content(
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Dibatalkan paksa", content = @Content(
                     mediaType = "application/json",
                     examples = @ExampleObject(value = "{\"statusCode\":200,\"message\":\"Pengajuan dibatalkan oleh admin\",\"data\":" + PENGAJUAN_CANCELLED_EXAMPLE + "}"))),
-            @ApiResponse(responseCode = "403", description = "Bukan role SUPERADMIN", content = @Content(
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "Bukan role SUPERADMIN", content = @Content(
                     mediaType = "application/json", examples = @ExampleObject(value = SwaggerExamples.FORBIDDEN)))
     })
     public ApiResponse<PengajuanEntity> cancelBySuperadmin(@PathVariable UUID id) {
@@ -287,7 +286,7 @@ public class PengajuanController {
     @GetMapping("/{id}/history")
     @Operation(summary = "Timeline review pengajuan (versi staff, mentah)", description = "Balikin ReviewLogEntity apa adanya termasuk identitas staff yang review - beda dari /{id}/history/me punya customer.")
     @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "OK", content = @Content(
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "OK", content = @Content(
                     mediaType = "application/json",
                     examples = @ExampleObject(value = "{\"statusCode\":200,\"message\":\"History pengajuan berhasil diambil\",\"data\":[{\"id\":\"1a2b3c4d-...\",\"action\":\"MARKETING_APPROVE\",\"catatan\":\"Dokumen lengkap\",\"createdAt\":\"2026-09-20T10:00:00\",\"user\":{\"namaLengkap\":\"Dewi Marketing\"}}]}")))
     })
