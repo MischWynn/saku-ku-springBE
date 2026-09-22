@@ -16,19 +16,16 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.context.request.WebRequest;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
+import lombok.extern.slf4j.Slf4j;
 
 import jakarta.persistence.EntityNotFoundException;
 
+@Slf4j
 @RestControllerAdvice
 public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 
     public static final String REQUIRED_AUTHENTICATION_MESSAGE = "Unauthorized access: Authentication required";
 
-    // Sebelum ini, kegagalan @Valid (field kosong/salah format dkk) jatuh ke default bawaan
-    // ResponseEntityExceptionHandler (bentuk ProblemDetail RFC 7807) - beda total sama bentuk
-    // {timestamp,status,error,message} yang dipakai semua exception lain di file ini. Override
-    // ini nyamain bentuknya, jadi SEMUA 400 di API ini punya 1 bentuk konsisten - juga berarti
-    // dokumentasi Swagger buat "400" akhirnya beneran akurat buat endpoint POST/PATCH manapun.
     @Override
     protected ResponseEntity<Object> handleMethodArgumentNotValid(
             MethodArgumentNotValidException ex,
@@ -63,11 +60,6 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         return build(HttpStatus.UNPROCESSABLE_CONTENT, e.getMessage());
     }
 
-    // DataIntegrityViolationException.getMessage() includes the raw SQL + bind values + DB
-    // error detail (Hibernate/Postgres nests the whole failed statement in there) - letting the
-    // generic RuntimeException handler below pass that straight to e.getMessage() would leak
-    // table/column names and row data to the client. Caught separately here on purpose, with a
-    // message that doesn't repeat what went wrong at the SQL level.
     @ExceptionHandler(DataIntegrityViolationException.class)
     public ResponseEntity<Map<String, Object>> handleDataIntegrityViolation(DataIntegrityViolationException e) {
         return build(HttpStatus.UNPROCESSABLE_CONTENT, "Data tidak valid atau bentrok dengan data yang sudah ada");
@@ -75,7 +67,14 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 
     @ExceptionHandler(RuntimeException.class)
     public ResponseEntity<Map<String, Object>> handleRuntimeException(RuntimeException e) {
+        log.error("Unhandled RuntimeException: {}", e.getMessage(), e);
         return build(HttpStatus.INTERNAL_SERVER_ERROR, e.getMessage());
+
+    }
+
+    @ExceptionHandler(IllegalStateException.class)
+    public ResponseEntity<Map<String, Object>> handleIllegalState(IllegalStateException e) {
+        return build(HttpStatus.SERVICE_UNAVAILABLE, "Layanan pihak ketiga sedang tidak tersedia, coba lagi nanti");
     }
 
         @ExceptionHandler(UsernameNotFoundException.class)

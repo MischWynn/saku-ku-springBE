@@ -1,10 +1,5 @@
 package com.binar.bc.saku_ku.config.swagger;
 
-// Contoh JSON dipakai bareng lintas controller buat body error yang bentuknya SELALU sama
-// (lihat GlobalExceptionHandler.body()) - {timestamp,status,error,message}. Ini bukan dokumentasi
-// buat 1 endpoint doang, jadi ditaro terpisah daripada ditulis ulang di tiap method.
-// Annotation value Java harus compile-time constant, makanya semua ini "public static final String"
-// polos, bukan method/builder.
 public final class SwaggerExamples {
 
     private SwaggerExamples() {}
