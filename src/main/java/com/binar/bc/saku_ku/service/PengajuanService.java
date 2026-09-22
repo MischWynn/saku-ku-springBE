@@ -43,6 +43,17 @@ public class PengajuanService {
         CustomerEntity customer = customerRepository.findById(currentCustomerId)
                 .orElseThrow(() -> new BusinessRuleException("Customer tidak ditemukan"));
 
+        // pekerjaan/pendapatanBulanan sengaja OPSIONAL pas registrasi (Step 3 Android cuma
+        // wajibin tipePekerjaan, dua field ini bisa dikosongin) - tapi keduanya WAJIB buat
+        // ngajuin pinjaman beneran, soalnya jadi basis formula plafond (UserPlafondService) dan
+        // DBR yang dilihat staff pas review. Tanpa ini, customer bisa ngajuin dengan plafond
+        // yang masih kejebak di fallback minimum dan data Employment & Financial kosong di
+        // drawer staff.
+        if (customer.getPekerjaan() == null || customer.getPekerjaan().isBlank()
+                || customer.getPendapatanBulanan() == null) {
+            throw new BusinessRuleException("Lengkapi data pekerjaan dan pendapatan bulanan di profil Anda sebelum mengajukan pinjaman");
+        }
+
         BungaTenorEntity bungaTenor = bungaTenorRepository.findById(request.getIdBungaTenor())
                 .orElseThrow(() -> new BusinessRuleException("Bunga tenor tidak ditemukan"));
 

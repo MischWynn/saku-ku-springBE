@@ -59,6 +59,11 @@ class PengajuanServiceTest {
         CustomerEntity customer = new CustomerEntity();
         customer.setId(UUID.randomUUID());
         customer.setPlafond(plafond);
+        // Profile-completeness fields (pekerjaan/pendapatanBulanan) - create()'s new gate needs
+        // both set, so every fixture here defaults to "complete" unless a Create test is
+        // specifically exercising that gate (see Create.throwsBusinessRuleException_whenProfile*).
+        customer.setPekerjaan("Staff Admin");
+        customer.setPendapatanBulanan(new BigDecimal("5000000"));
         return customer;
     }
 
@@ -156,6 +161,32 @@ class PengajuanServiceTest {
             assertThatThrownBy(() -> service.create(customerId, request("1000000")))
                     .isInstanceOf(BusinessRuleException.class)
                     .hasMessageContaining("Customer tidak ditemukan");
+        }
+
+        @Test
+        void throwsBusinessRuleException_whenPekerjaanMissing() {
+            CustomerEntity customer = customerWithFallbackPlafond(new BigDecimal("10000000"));
+            customer.setId(customerId);
+            customer.setPekerjaan(null);
+            when(customerRepository.findById(customerId)).thenReturn(Optional.of(customer));
+
+            assertThatThrownBy(() -> service.create(customerId, request("1000000")))
+                    .isInstanceOf(BusinessRuleException.class)
+                    .hasMessageContaining("Lengkapi data pekerjaan dan pendapatan bulanan");
+
+            verify(bungaTenorRepository, never()).findById(any());
+        }
+
+        @Test
+        void throwsBusinessRuleException_whenPendapatanBulananMissing() {
+            CustomerEntity customer = customerWithFallbackPlafond(new BigDecimal("10000000"));
+            customer.setId(customerId);
+            customer.setPendapatanBulanan(null);
+            when(customerRepository.findById(customerId)).thenReturn(Optional.of(customer));
+
+            assertThatThrownBy(() -> service.create(customerId, request("1000000")))
+                    .isInstanceOf(BusinessRuleException.class)
+                    .hasMessageContaining("Lengkapi data pekerjaan dan pendapatan bulanan");
         }
 
         @Test
