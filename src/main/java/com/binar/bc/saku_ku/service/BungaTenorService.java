@@ -5,6 +5,8 @@ import com.binar.bc.saku_ku.entity.BungaTenorEntity;
 import com.binar.bc.saku_ku.exception.BusinessRuleException;
 import com.binar.bc.saku_ku.repository.BungaTenorRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -18,6 +20,10 @@ public class BungaTenorService {
 
     private final BungaTenorRepository bungaTenorRepository;
 
+    // Sengaja cuma getAll() yang di-cache, bukan getById() - getAll() yang "dibaca terus-
+    // menerus" (widget simulasi cicilan, dropdown tenor pengajuan). getById() dipanggil jauh
+    // lebih jarang, gak worth kompleksitas nulis cache key per-ID buat gain yang kecil.
+    @Cacheable("bungaTenor")
     public List<BungaTenorEntity> getAll() {
         return bungaTenorRepository.findAll();
     }
@@ -27,6 +33,7 @@ public class BungaTenorService {
                 .orElseThrow(() -> new RuntimeException("Bunga tenor not found with id: " + id));
     }
 
+    @CacheEvict(value = "bungaTenor", allEntries = true)
     @Transactional
     public BungaTenorEntity create(BungaTenorRequest request) {
         if (bungaTenorRepository.existsByTenor(request.getTenor())) {
@@ -41,6 +48,7 @@ public class BungaTenorService {
         return bungaTenorRepository.save(entity);
     }
 
+    @CacheEvict(value = "bungaTenor", allEntries = true)
     @Transactional
     public BungaTenorEntity update(UUID id, BungaTenorRequest request) {
         BungaTenorEntity entity = bungaTenorRepository.findById(id)
@@ -59,6 +67,7 @@ public class BungaTenorService {
         return bungaTenorRepository.save(entity);
     }
 
+    @CacheEvict(value = "bungaTenor", allEntries = true)
     @Transactional
     public void delete(UUID id) {
         BungaTenorEntity entity = bungaTenorRepository.findById(id)

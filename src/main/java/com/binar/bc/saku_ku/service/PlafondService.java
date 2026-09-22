@@ -5,6 +5,8 @@ import com.binar.bc.saku_ku.entity.PlafondEntity;
 import com.binar.bc.saku_ku.exception.BusinessRuleException;
 import com.binar.bc.saku_ku.repository.PlafondRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -18,10 +20,18 @@ public class PlafondService {
 
     private final PlafondRepository plafondRepository;
 
+    // getAll() gak punya parameter, jadi semua caller nge-share 1 entry cache yang sama
+    // ("cache:plafond:SimpleKey.EMPTY" di Redis - cek pakai `redis-cli KEYS "cache:*"`).
+    // Panggilan PERTAMA beneran query DB & isi cache; panggilan berikutnya (dalam 30 menit,
+    // lihat TTL di RedisConfig) langsung dari Redis, DB gak disentuh sama sekali.
+    @Cacheable("plafond")
     public List<PlafondEntity> getAll() {
         return plafondRepository.findAll();
     }
 
+    // allEntries=true karena cache-nya cuma 1 entry (list lengkap) - kalau ada 1 baris baru/
+    // berubah/kehapus, seluruh cache list itu jadi basi, bukan cuma 1 baris di dalamnya.
+    @CacheEvict(value = "plafond", allEntries = true)
     @Transactional
     public PlafondEntity create(PlafondRequest request) {
         PlafondEntity plafond = new PlafondEntity();
@@ -33,6 +43,7 @@ public class PlafondService {
         return plafondRepository.save(plafond);
     }
 
+    @CacheEvict(value = "plafond", allEntries = true)
     @Transactional
     public PlafondEntity update(UUID id, PlafondRequest request) {
         PlafondEntity plafond = plafondRepository.findById(id)
@@ -47,6 +58,7 @@ public class PlafondService {
         return plafondRepository.save(plafond);
     }
 
+    @CacheEvict(value = "plafond", allEntries = true)
     @Transactional
     public void delete(UUID id) {
         if (!plafondRepository.existsById(id)) {
