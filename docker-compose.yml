@@ -28,6 +28,14 @@ services:
       - .env
     environment:
       DB_URL: jdbc:postgresql://db:5432/binar_finance
+    volumes:
+      # firebase-service-account.json is deliberately .dockerignore'd out of the image (never
+      # baked into a layer). Without this mount, FirebaseConfig silently skips init (by design,
+      # so FCM being unavailable doesn't crash the app) and any call that needs the Admin SDK -
+      # Google Sign-In's verifyIdToken() included - fails with "FirebaseApp with name [DEFAULT]
+      # doesn't exist". The file itself must already exist at ~/sakuku/firebase-service-account.json
+      # on the VM (same directory as this compose file) - it is NOT copied here by CI/CD.
+      - ./firebase-service-account.json:/app/firebase-service-account.json:ro
     ports:
       - "8080:8080"
     networks:
