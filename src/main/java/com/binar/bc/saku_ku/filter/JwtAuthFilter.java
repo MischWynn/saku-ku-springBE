@@ -76,7 +76,7 @@ public class JwtAuthFilter extends OncePerRequestFilter {
             }
 
             SecurityContextHolder.getContext().setAuthentication(authentication);
-        } catch (JwtException | UsernameNotFoundException | IllegalArgumentException e) {
+        } catch (JwtException | UsernameNotFoundException | IllegalArgumentException | UnauthorizedException e) {
             SecurityContextHolder.clearContext();
             unauthorizedHandler.response(response, INVALID_TOKEN);
             return;

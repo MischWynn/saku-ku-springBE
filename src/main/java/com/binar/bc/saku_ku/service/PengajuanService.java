@@ -1,5 +1,6 @@
 package com.binar.bc.saku_ku.service;
 
+import com.binar.bc.saku_ku.util.AgePolicy;
 import com.binar.bc.saku_ku.dto.PengajuanRequest;
 import com.binar.bc.saku_ku.dto.PengajuanReviewRequest;
 import com.binar.bc.saku_ku.entity.BungaTenorEntity;
@@ -52,6 +53,19 @@ public class PengajuanService {
         if (customer.getPekerjaan() == null || customer.getPekerjaan().isBlank()
                 || customer.getPendapatanBulanan() == null) {
             throw new BusinessRuleException("Lengkapi data pekerjaan dan pendapatan bulanan di profil Anda sebelum mengajukan pinjaman");
+        }
+        // Tanggal lahir juga bagian dari profil lengkap, dan nasabah harus minimal 17 tahun
+        // (syarat KTP) - sama kayak gerbang di layar Ajukan Pinjaman Android.
+        if (customer.getTanggalLahir() == null) {
+            throw new BusinessRuleException("Lengkapi tanggal lahir di profil Anda sebelum mengajukan pinjaman");
+        }
+        if (!AgePolicy.isOldEnough(customer.getTanggalLahir())) {
+            throw new BusinessRuleException("Pengajuan pinjaman hanya untuk nasabah berusia minimal " + AgePolicy.MIN_AGE + " tahun");
+        }
+        // Rekening tujuan pencairan wajib ada - dana yang disetujui dicairin ke sini.
+        if (isBlank(customer.getNamaBank()) || isBlank(customer.getNomorRekening())
+                || isBlank(customer.getNamaPemilikRekening())) {
+            throw new BusinessRuleException("Lengkapi data rekening bank di profil Anda sebelum mengajukan pinjaman");
         }
 
         BungaTenorEntity bungaTenor = bungaTenorRepository.findById(request.getIdBungaTenor())
@@ -248,6 +262,10 @@ public class PengajuanService {
     }
 
     // ==== Helper internal ====
+
+    private static boolean isBlank(String value) {
+        return value == null || value.isBlank();
+    }
 
     private PengajuanEntity requireStatus(UUID id, String expectedStatus) {
         PengajuanEntity pengajuan = getById(id);

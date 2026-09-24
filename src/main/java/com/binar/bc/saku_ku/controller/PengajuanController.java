@@ -163,6 +163,23 @@ public class PengajuanController {
         return ApiResponse.success(pengajuanService.getById(id), "Pengajuan berhasil diambil");
     }
 
+    // Endpoint terpisah dari getById() di atas - fotoKtp itu base64 (bisa ratusan KB), sengaja
+    // GAK ikut nempel di response detail/list biasa (CustomerEntity.fotoKtp @JsonIgnore) biar
+    // payload gak berat kalau gak lagi dibutuhin. Cuma diambil pas staff eksplisit buka foto-nya.
+    @GetMapping("/{id}/ktp")
+    @Operation(summary = "Foto KTP customer pemilik pengajuan ini (staff)", description = "Base64 mentah (tanpa prefix data-URI), null kalau customer belum pernah unggah foto KTP.")
+    @ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "OK (data bisa null)", content = @Content(
+                    mediaType = "application/json", examples = @ExampleObject(value = "{\"statusCode\":200,\"message\":\"Foto KTP berhasil diambil\",\"data\":\"/9j/4AAQSkZJRgABAQAAAQABAAD...\"}"))),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "ID tidak ditemukan", content = @Content(
+                    mediaType = "application/json", examples = @ExampleObject(value = SwaggerExamples.NOT_FOUND)))
+    })
+    public ApiResponse<String> getKtpPhoto(@PathVariable UUID id) {
+        String fotoKtp = pengajuanService.getById(id).getCustomer().getFotoKtp();
+        String message = fotoKtp != null ? "Foto KTP berhasil diambil" : "Customer belum mengunggah foto KTP";
+        return ApiResponse.success(fotoKtp, message);
+    }
+
     @GetMapping("/status/{status}")
     @Operation(summary = "Filter pengajuan by status (dipakai queue per role di dashboard staff)", description = "status: MARKETING_REVIEW | MARKETING_REJECTED | BM_REVIEW | BM_REJECTED | BACKOFFICE_REVIEW | DISBURSED | CANCELLED")
     @ApiResponses({

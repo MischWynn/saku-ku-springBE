@@ -1,9 +1,11 @@
 package com.binar.bc.saku_ku.service;
 
 import com.binar.bc.saku_ku.dto.PengajuanRequest;
+import com.binar.bc.saku_ku.dto.PengajuanReviewRequest;
 import com.binar.bc.saku_ku.entity.BungaTenorEntity;
 import com.binar.bc.saku_ku.entity.CustomerEntity;
 import com.binar.bc.saku_ku.entity.PengajuanEntity;
+import com.binar.bc.saku_ku.entity.UserEntity;
 import com.binar.bc.saku_ku.entity.UserPlafondEntity;
 import com.binar.bc.saku_ku.exception.BusinessRuleException;
 import com.binar.bc.saku_ku.repository.BungaTenorRepository;
@@ -19,6 +21,8 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -64,6 +68,11 @@ class PengajuanServiceTest {
         // specifically exercising that gate (see Create.throwsBusinessRuleException_whenProfile*).
         customer.setPekerjaan("Staff Admin");
         customer.setPendapatanBulanan(new BigDecimal("5000000"));
+        // Tanggal lahir juga bagian dari gate "profil lengkap" + minimal 17 tahun (AgePolicy).
+        customer.setTanggalLahir(LocalDate.now().minusYears(25));
+        customer.setNamaBank("BCA");
+        customer.setNomorRekening("1234567890");
+        customer.setNamaPemilikRekening("Novita Sari");
         return customer;
     }
 
@@ -190,6 +199,48 @@ class PengajuanServiceTest {
         }
 
         @Test
+        void throwsBusinessRuleException_whenTanggalLahirMissing() {
+            CustomerEntity customer = customerWithFallbackPlafond(new BigDecimal("10000000"));
+            customer.setId(customerId);
+            customer.setTanggalLahir(null);
+            when(customerRepository.findById(customerId)).thenReturn(Optional.of(customer));
+
+            assertThatThrownBy(() -> service.create(customerId, request("1000000")))
+                    .isInstanceOf(BusinessRuleException.class)
+                    .hasMessageContaining("Lengkapi tanggal lahir");
+
+            verify(bungaTenorRepository, never()).findById(any());
+        }
+
+        @Test
+        void throwsBusinessRuleException_whenCustomerUnder17() {
+            CustomerEntity customer = customerWithFallbackPlafond(new BigDecimal("10000000"));
+            customer.setId(customerId);
+            customer.setTanggalLahir(LocalDate.now().minusYears(17).plusDays(1));
+            when(customerRepository.findById(customerId)).thenReturn(Optional.of(customer));
+
+            assertThatThrownBy(() -> service.create(customerId, request("1000000")))
+                    .isInstanceOf(BusinessRuleException.class)
+                    .hasMessageContaining("minimal 17 tahun");
+
+            verify(bungaTenorRepository, never()).findById(any());
+        }
+
+        @Test
+        void throwsBusinessRuleException_whenRekeningMissing() {
+            CustomerEntity customer = customerWithFallbackPlafond(new BigDecimal("10000000"));
+            customer.setId(customerId);
+            customer.setNomorRekening(null);
+            when(customerRepository.findById(customerId)).thenReturn(Optional.of(customer));
+
+            assertThatThrownBy(() -> service.create(customerId, request("1000000")))
+                    .isInstanceOf(BusinessRuleException.class)
+                    .hasMessageContaining("rekening bank");
+
+            verify(bungaTenorRepository, never()).findById(any());
+        }
+
+        @Test
         void throwsBusinessRuleException_whenBungaTenorNotFound() {
             CustomerEntity customer = customerWithFallbackPlafond(new BigDecimal("10000000"));
             customer.setId(customerId);
@@ -268,6 +319,260 @@ class PengajuanServiceTest {
 
             assertThat(result).isNotNull();
             verify(pengajuanRepository, never()).sumHeldNominalByCustomer(eq(customerId));
+        }
+    }
+
+    @Nested
+    class Reads {
+
+        @Test
+        void getById_returns_whenFound() {
+            UUID id = UUID.randomUUID();
+            PengajuanEntity pengajuan = new PengajuanEntity();
+            pengajuan.setId(id);
+            when(pengajuanRepository.findById(id)).thenReturn(Optional.of(pengajuan));
+
+            assertThat(service.getById(id)).isSameAs(pengajuan);
+        }
+
+        @Test
+        void getById_throws_whenNotFound() {
+            UUID id = UUID.randomUUID();
+            when(pengajuanRepository.findById(id)).thenReturn(Optional.empty());
+
+            assertThatThrownBy(() -> service.getById(id)).isInstanceOf(BusinessRuleException.class);
+        }
+
+        @Test
+        void getByCustomer_delegatesToRepository() {
+            UUID customerId = UUID.randomUUID();
+            PengajuanEntity pengajuan = new PengajuanEntity();
+            when(pengajuanRepository.findByCustomerId(customerId)).thenReturn(List.of(pengajuan));
+
+            assertThat(service.getByCustomer(customerId)).containsExactly(pengajuan);
+        }
+
+        @Test
+        void getByStatus_delegatesToRepository() {
+            PengajuanEntity pengajuan = new PengajuanEntity();
+            when(pengajuanRepository.findByStatus("MARKETING_REVIEW")).thenReturn(List.of(pengajuan));
+
+            assertThat(service.getByStatus("MARKETING_REVIEW")).containsExactly(pengajuan);
+        }
+
+        @Test
+        void getAll_delegatesToRepository() {
+            PengajuanEntity pengajuan = new PengajuanEntity();
+            when(pengajuanRepository.findAll()).thenReturn(List.of(pengajuan));
+
+            assertThat(service.getAll()).containsExactly(pengajuan);
+        }
+    }
+
+    @Nested
+    class ReviewWorkflow {
+
+        private final UUID id = UUID.randomUUID();
+
+        private PengajuanEntity pengajuanWithStatus(String status) {
+            PengajuanEntity pengajuan = new PengajuanEntity();
+            pengajuan.setId(id);
+            pengajuan.setStatus(status);
+            pengajuan.setNominalPengajuan(new BigDecimal("5000000"));
+            pengajuan.setCustomer(new CustomerEntity());
+            return pengajuan;
+        }
+
+        private UserEntity staffUser() {
+            UserEntity user = new UserEntity();
+            user.setUsername("dewi.marketing");
+            return user;
+        }
+
+        @BeforeEach
+        void stubSaveAndUser() {
+            org.mockito.Mockito.lenient().when(pengajuanRepository.save(any(PengajuanEntity.class)))
+                    .thenAnswer(inv -> inv.getArgument(0));
+            org.mockito.Mockito.lenient().when(userRepository.findByUsernameAndDeletedDateIsNull("dewi.marketing"))
+                    .thenReturn(Optional.of(staffUser()));
+        }
+
+        @Test
+        void marketingApprove_movesToBmReview() {
+            when(pengajuanRepository.findById(id)).thenReturn(Optional.of(pengajuanWithStatus("MARKETING_REVIEW")));
+
+            PengajuanEntity result = service.marketingApprove(id, "dewi.marketing", new PengajuanReviewRequest());
+
+            assertThat(result.getStatus()).isEqualTo("BM_REVIEW");
+            verify(reviewLogService).record(any(), any(), eq("APPROVE"), eq("MARKETING_REVIEW"), eq("BM_REVIEW"), any());
+        }
+
+        @Test
+        void marketingApprove_throws_whenWrongStatus() {
+            when(pengajuanRepository.findById(id)).thenReturn(Optional.of(pengajuanWithStatus("BM_REVIEW")));
+
+            assertThatThrownBy(() -> service.marketingApprove(id, "dewi.marketing", new PengajuanReviewRequest()))
+                    .isInstanceOf(BusinessRuleException.class);
+        }
+
+        @Test
+        void marketingReject_movesToMarketingRejected() {
+            when(pengajuanRepository.findById(id)).thenReturn(Optional.of(pengajuanWithStatus("MARKETING_REVIEW")));
+
+            PengajuanEntity result = service.marketingReject(id, "dewi.marketing", new PengajuanReviewRequest());
+
+            assertThat(result.getStatus()).isEqualTo("MARKETING_REJECTED");
+        }
+
+        @Test
+        void bmApprove_setsNominalDisetujui_andMovesToBackofficeReview() {
+            when(pengajuanRepository.findById(id)).thenReturn(Optional.of(pengajuanWithStatus("BM_REVIEW")));
+            PengajuanReviewRequest request = new PengajuanReviewRequest();
+            request.setNominalDisetujui(new BigDecimal("4000000"));
+
+            PengajuanEntity result = service.bmApprove(id, "dewi.marketing", request);
+
+            assertThat(result.getStatus()).isEqualTo("BACKOFFICE_REVIEW");
+            assertThat(result.getNominalDisetujui()).isEqualByComparingTo("4000000");
+        }
+
+        @Test
+        void bmApprove_throws_whenNominalDisetujuiMissing() {
+            when(pengajuanRepository.findById(id)).thenReturn(Optional.of(pengajuanWithStatus("BM_REVIEW")));
+
+            assertThatThrownBy(() -> service.bmApprove(id, "dewi.marketing", new PengajuanReviewRequest()))
+                    .isInstanceOf(BusinessRuleException.class)
+                    .hasMessageContaining("wajib diisi");
+        }
+
+        @Test
+        void bmApprove_throws_whenNominalDisetujuiExceedsRequested() {
+            when(pengajuanRepository.findById(id)).thenReturn(Optional.of(pengajuanWithStatus("BM_REVIEW")));
+            PengajuanReviewRequest request = new PengajuanReviewRequest();
+            request.setNominalDisetujui(new BigDecimal("9999999999"));
+
+            assertThatThrownBy(() -> service.bmApprove(id, "dewi.marketing", request))
+                    .isInstanceOf(BusinessRuleException.class)
+                    .hasMessageContaining("tidak boleh lebih besar");
+        }
+
+        @Test
+        void bmReject_movesToBmRejected() {
+            when(pengajuanRepository.findById(id)).thenReturn(Optional.of(pengajuanWithStatus("BM_REVIEW")));
+
+            PengajuanEntity result = service.bmReject(id, "dewi.marketing", new PengajuanReviewRequest());
+
+            assertThat(result.getStatus()).isEqualTo("BM_REJECTED");
+        }
+
+        @Test
+        void disburse_movesToDisbursed_andSetsTanggalPencairan() {
+            when(pengajuanRepository.findById(id)).thenReturn(Optional.of(pengajuanWithStatus("BACKOFFICE_REVIEW")));
+
+            PengajuanEntity result = service.disburse(id, "dewi.marketing");
+
+            assertThat(result.getStatus()).isEqualTo("DISBURSED");
+            assertThat(result.getTanggalPencairan()).isNotNull();
+        }
+
+        @Test
+        void disburse_throws_whenStaffUserNotFound() {
+            when(pengajuanRepository.findById(id)).thenReturn(Optional.of(pengajuanWithStatus("BACKOFFICE_REVIEW")));
+            when(userRepository.findByUsernameAndDeletedDateIsNull("ghost")).thenReturn(Optional.empty());
+
+            assertThatThrownBy(() -> service.disburse(id, "ghost")).isInstanceOf(BusinessRuleException.class);
+        }
+    }
+
+    @Nested
+    class Cancel {
+
+        private final UUID id = UUID.randomUUID();
+
+        @BeforeEach
+        void stubSave() {
+            org.mockito.Mockito.lenient().when(pengajuanRepository.save(any(PengajuanEntity.class)))
+                    .thenAnswer(inv -> inv.getArgument(0));
+        }
+
+        @Test
+        void cancelByCustomer_cancels_whenOwnedAndCancellableStatus() {
+            UUID customerId = UUID.randomUUID();
+            CustomerEntity customer = new CustomerEntity();
+            customer.setId(customerId);
+            PengajuanEntity pengajuan = new PengajuanEntity();
+            pengajuan.setId(id);
+            pengajuan.setStatus("MARKETING_REVIEW");
+            pengajuan.setCustomer(customer);
+            when(pengajuanRepository.findById(id)).thenReturn(Optional.of(pengajuan));
+
+            PengajuanEntity result = service.cancelByCustomer(id, customerId);
+
+            assertThat(result.getStatus()).isEqualTo("CANCELLED");
+        }
+
+        @Test
+        void cancelByCustomer_throws_whenNotOwner() {
+            CustomerEntity customer = new CustomerEntity();
+            customer.setId(UUID.randomUUID());
+            PengajuanEntity pengajuan = new PengajuanEntity();
+            pengajuan.setId(id);
+            pengajuan.setCustomer(customer);
+            when(pengajuanRepository.findById(id)).thenReturn(Optional.of(pengajuan));
+
+            assertThatThrownBy(() -> service.cancelByCustomer(id, UUID.randomUUID()))
+                    .isInstanceOf(BusinessRuleException.class)
+                    .hasMessageContaining("tidak berhak");
+        }
+
+        @Test
+        void cancelByCustomer_throws_whenNotCancellableStatus() {
+            UUID customerId = UUID.randomUUID();
+            CustomerEntity customer = new CustomerEntity();
+            customer.setId(customerId);
+            PengajuanEntity pengajuan = new PengajuanEntity();
+            pengajuan.setId(id);
+            pengajuan.setStatus("DISBURSED");
+            pengajuan.setCustomer(customer);
+            when(pengajuanRepository.findById(id)).thenReturn(Optional.of(pengajuan));
+
+            assertThatThrownBy(() -> service.cancelByCustomer(id, customerId))
+                    .isInstanceOf(BusinessRuleException.class)
+                    .hasMessageContaining("tidak bisa dibatalkan");
+        }
+
+        @Test
+        void cancelBySuperadmin_cancels_whenNotTerminal() {
+            PengajuanEntity pengajuan = new PengajuanEntity();
+            pengajuan.setId(id);
+            pengajuan.setStatus("BM_REVIEW");
+            when(pengajuanRepository.findById(id)).thenReturn(Optional.of(pengajuan));
+
+            PengajuanEntity result = service.cancelBySuperadmin(id);
+
+            assertThat(result.getStatus()).isEqualTo("CANCELLED");
+        }
+
+        @Test
+        void cancelBySuperadmin_throws_whenAlreadyDisbursed() {
+            PengajuanEntity pengajuan = new PengajuanEntity();
+            pengajuan.setId(id);
+            pengajuan.setStatus("DISBURSED");
+            when(pengajuanRepository.findById(id)).thenReturn(Optional.of(pengajuan));
+
+            assertThatThrownBy(() -> service.cancelBySuperadmin(id))
+                    .isInstanceOf(BusinessRuleException.class)
+                    .hasMessageContaining("sudah dicairkan");
+        }
+
+        @Test
+        void cancelBySuperadmin_throws_whenAlreadyTerminal() {
+            PengajuanEntity pengajuan = new PengajuanEntity();
+            pengajuan.setId(id);
+            pengajuan.setStatus("CANCELLED");
+            when(pengajuanRepository.findById(id)).thenReturn(Optional.of(pengajuan));
+
+            assertThatThrownBy(() -> service.cancelBySuperadmin(id)).isInstanceOf(BusinessRuleException.class);
         }
     }
 }

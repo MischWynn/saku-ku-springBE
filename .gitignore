@@ -53,3 +53,4 @@ backend-restart.log
 ##DOCKER##
 sakuku-backed.tar
 *.tar
+/scripts/sync-binar-to-gcp.sh

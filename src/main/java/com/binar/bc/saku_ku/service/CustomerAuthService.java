@@ -1,5 +1,6 @@
 package com.binar.bc.saku_ku.service;
 
+import com.binar.bc.saku_ku.util.AgePolicy;
 import com.binar.bc.saku_ku.dto.AuthResponseDTO;
 import com.binar.bc.saku_ku.dto.CustomerChangePasswordRequest;
 import com.binar.bc.saku_ku.dto.CustomerDeleteAccountRequest;
@@ -61,6 +62,11 @@ public class CustomerAuthService {
         if (request.getNik() != null && customerRepository.existsByNik(request.getNik())) {
             throw new BusinessRuleException("NIK sudah terdaftar");
         }
+        // Tanggal lahir opsional pas register (Android ngirimnya belakangan lewat PATCH /me),
+        // tapi kalau dikirim harus udah cukup umur.
+        if (request.getTanggalLahir() != null && !AgePolicy.isOldEnough(request.getTanggalLahir())) {
+            throw new BusinessRuleException("Usia minimal " + AgePolicy.MIN_AGE + " tahun (sesuai syarat kepemilikan KTP)");
+        }
 
         CustomerEntity customer = new CustomerEntity();
         customer.setNamaLengkap(request.getNamaLengkap());
@@ -86,7 +92,10 @@ public class CustomerAuthService {
 
         CustomerEntity saved = customerRepository.save(customer);
         userPlafondService.calculateAndAssign(saved);
-        saved = customerRepository.save(saved); // persist plafond sync dari calculateAndAssign
+        // saveAndFlush (bukan save): INSERT-nya dipaksa jalan SEKARANG, bukan nunggu commit di
+        // akhir method. Tanpa flush, pelanggaran constraint DB (mis. kolom NOT NULL) baru
+        // ketauan pas commit - SETELAH email OTP udah terlanjur kekirim ke akun yang gak jadi dibuat.
+        saved = customerRepository.saveAndFlush(saved); // persist plafond sync dari calculateAndAssign
 
         otpService.generateAndSend(saved.getEmail(), PURPOSE_REGISTER_VERIFY);
 
@@ -96,10 +105,19 @@ public class CustomerAuthService {
     public ResponseEntity<AuthResponseDTO> login(CustomerLoginRequest request) {
         Optional<AppCustomerEntity> found = appCustomerDetailsService.findCustomer(request.getIdentifier());
 
-        if (found.isEmpty() || !passwordEncoder.matches(request.getPassword(), found.get().getPassword())) {
-            throw new UnauthorizedException("Email/No HP atau password salah");
+        if (found.isEmpty()) {
+            throw new UnauthorizedException("Akun belum terdaftar, silahkan daftar terlebih dahulu.");
         }
 
+        if (!passwordEncoder.matches(request.getPassword(), found.get().getPassword())) {
+            throw new UnauthorizedException("Email atau password salah");
+
+        }
+
+        // if (found.get().getDeletedDate() != null) {
+        //     throw new UnauthorizedException("Akun sudah dihapus");
+        // }
+        
         AppCustomerEntity customer = found.get();
 
         // AppCustomerEntity (principal) gak bawa status — cek langsung ke entity aslinya.
@@ -198,7 +216,10 @@ public class CustomerAuthService {
                 .orElseThrow(() -> new BusinessRuleException("Customer tidak ditemukan"));
 
         if (!passwordEncoder.matches(request.getOldPassword(), customer.getPasswordHash())) {
-            throw new UnauthorizedException("Password lama salah");
+            // BusinessRuleException (422), BUKAN 401: user-nya udah login dengan token valid, yang
+            // salah cuma isian form. Android nganggep SEMUA 401 = sesi habis -> token dihapus +
+            // dilempar ke Login.
+            throw new BusinessRuleException("Password lama salah");
         }
 
         customer.setPasswordHash(passwordEncoder.encode(request.getNewPassword()));
@@ -247,7 +268,12 @@ public class CustomerAuthService {
         }
 
         if (request.getAlamat() != null) customer.setAlamat(request.getAlamat());
-        if (request.getTanggalLahir() != null) customer.setTanggalLahir(request.getTanggalLahir());
+        if (request.getTanggalLahir() != null) {
+            if (!AgePolicy.isOldEnough(request.getTanggalLahir())) {
+                throw new BusinessRuleException("Usia minimal " + AgePolicy.MIN_AGE + " tahun (sesuai syarat kepemilikan KTP)");
+            }
+            customer.setTanggalLahir(request.getTanggalLahir());
+        }
         if (request.getTipePekerjaan() != null) customer.setTipePekerjaan(request.getTipePekerjaan());
         if (request.getPekerjaan() != null) customer.setPekerjaan(request.getPekerjaan());
         if (request.getLamaBekerjaBulan() != null) customer.setLamaBekerjaBulan(request.getLamaBekerjaBulan());
@@ -280,7 +306,9 @@ public class CustomerAuthService {
                 .orElseThrow(() -> new BusinessRuleException("Customer tidak ditemukan"));
 
         if (!passwordEncoder.matches(request.getPassword(), customer.getPasswordHash())) {
-            throw new UnauthorizedException("Password salah");
+            // 422 bukan 401 - lihat catatan di changePassword(). Dulu salah password di dialog
+            // Hapus Akun bikin user ke-logout ke Login (akunnya tetap aman, gak kehapus).
+            throw new BusinessRuleException("Password salah");
         }
         if (customer.getDeletedDate() != null) {
             throw new BusinessRuleException("Akun sudah dihapus");

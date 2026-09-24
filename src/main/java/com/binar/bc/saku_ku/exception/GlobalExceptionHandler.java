@@ -62,6 +62,10 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 
     @ExceptionHandler(DataIntegrityViolationException.class)
     public ResponseEntity<Map<String, Object>> handleDataIntegrityViolation(DataIntegrityViolationException e) {
+        // Pesan ke client sengaja tetap generik (gak bocorin SQL/nama constraint), tapi penyebab
+        // aslinya (constraint/kolom mana yang ditolak DB) dicatat di log server - cek lewat
+        // `docker logs sakuku-backend` di VM.
+        log.warn("DataIntegrityViolation: {}", e.getMostSpecificCause().getMessage());
         return build(HttpStatus.UNPROCESSABLE_CONTENT, "Data tidak valid atau bentrok dengan data yang sudah ada");
     }
 

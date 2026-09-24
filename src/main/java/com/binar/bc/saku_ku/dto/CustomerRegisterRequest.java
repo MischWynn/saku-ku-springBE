@@ -29,6 +29,9 @@ public class CustomerRegisterRequest {
     private String alamat;
 
     @NotBlank(message = "Password cannot be empty")
+    @Pattern(
+            regexp = "^(?=.*[a-z])(?=.*[A-Z])(?=.*[0-9]).{8,}$",
+            message = "Password minimal 8 karakter dan harus mengandung huruf besar, huruf kecil, dan angka")
     private String password;
 
     private LocalDate tanggalLahir;
