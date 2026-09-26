@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="id">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Saku-Ku API Reference</title>
+</head>
+<body>
+    <!-- Scalar baca spec yang sama persis kayak Swagger UI (/v3/api-docs, di-generate springdoc
+         dari anotasi controller) - jadi gak ada dokumentasi yang perlu di-maintain dobel. -->
+    <div id="app"></div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@scalar/api-reference"></script>
+    <script>
+        Scalar.createApiReference('#app', {
+            url: '/v3/api-docs',
+            theme: 'deepSpace',
+            darkMode: true,
+            layout: 'modern',
+            // Tombol "Authorize" langsung pakai scheme bearerAuth dari OpenApiConfig - tempel JWT
+            // dari /api/v1/user/login atau /api/v1/customer/login, token disimpen di browser.
+            authentication: {
+                preferredSecurityScheme: 'bearerAuth',
+            },
+            persistAuth: true,
+            defaultHttpClient: {
+                targetKey: 'shell',
+                clientKey: 'curl',
+            },
+            // Sembunyiin toolbar/fitur cloud Scalar (Deploy, Share, Ask AI, Generate MCP) - gak relevan buat project ini.
+            showDeveloperTools: 'never',
+            showToolbar: 'never',
+            agent: { disabled: true },
+            mcp: { disabled: true },
+            hideClientButton: false,
+            metaData: {
+                title: 'Saku-Ku API Reference',
+            },
+        });
+    </script>
+</body>
+</html>

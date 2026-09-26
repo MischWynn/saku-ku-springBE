@@ -48,6 +48,7 @@ public class SecurityConfig {
                         // Swagger UI + the generated OpenAPI spec it reads from - has to be
                         // reachable without a token, otherwise nobody can even open the docs page.
                         .requestMatchers("/swagger-ui/**", "/swagger-ui.html", "/v3/api-docs/**").permitAll()
+                        .requestMatchers("/scalar", "/scalar.html").permitAll()
                         .requestMatchers("/api/v1/auth/**").permitAll()
                         .requestMatchers("/api/v1/user/login").permitAll()
                         .requestMatchers("/api/v1/user/forgot-password").permitAll()

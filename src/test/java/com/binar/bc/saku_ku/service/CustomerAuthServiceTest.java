@@ -139,6 +139,71 @@ class CustomerAuthServiceTest {
         }
 
         @Test
+        void rejectsDuplicateEmail_whenExistingAccountIsActive() {
+            CustomerRegisterRequest request = validRequest();
+            CustomerEntity active = new CustomerEntity();
+            active.setId(UUID.randomUUID());
+            active.setStatus("ACTIVE");
+            when(customerRepository.existsByEmail(request.getEmail())).thenReturn(true);
+            when(customerRepository.findByEmail(request.getEmail())).thenReturn(Optional.of(active));
+
+            assertThatThrownBy(() -> service.register(request))
+                    .isInstanceOf(BusinessRuleException.class)
+                    .hasMessageContaining("Email sudah terdaftar");
+
+            verify(otpService, never()).generateAndSend(anyString(), anyString());
+        }
+
+        @Test
+        void resumesUnfinishedRegistration_insteadOfRejectingEmail() {
+            // Registrasi yang ditinggal sebelum OTP: akun yang sama dilanjutin (bukan akun
+            // baru), no HP miliknya sendiri gak dianggap bentrok, plafond di-update bukan
+            // di-insert ulang, dan OTP baru dikirim.
+            CustomerRegisterRequest request = validRequest();
+            CustomerEntity unfinished = new CustomerEntity();
+            UUID id = UUID.randomUUID();
+            unfinished.setId(id);
+            unfinished.setStatus("PENDING_VERIFICATION");
+            unfinished.setNamaLengkap("Nama Lama");
+            when(customerRepository.existsByEmail(request.getEmail())).thenReturn(true);
+            when(customerRepository.findByEmail(request.getEmail())).thenReturn(Optional.of(unfinished));
+            when(customerRepository.existsByNoHp(request.getNoHp())).thenReturn(true);
+            when(customerRepository.findByNoHp(request.getNoHp())).thenReturn(Optional.of(unfinished));
+            when(passwordEncoder.encode(request.getPassword())).thenReturn("hashed-password");
+            when(customerRepository.save(any(CustomerEntity.class))).thenAnswer(inv -> inv.getArgument(0));
+            when(customerRepository.saveAndFlush(any(CustomerEntity.class))).thenAnswer(inv -> inv.getArgument(0));
+
+            CustomerResponseDTO result = service.register(request);
+
+            assertThat(result.getId()).isEqualTo(id);
+            assertThat(result.getNamaLengkap()).isEqualTo("Budi Santoso");
+            assertThat(result.getStatus()).isEqualTo("PENDING_VERIFICATION");
+            verify(userPlafondService).recalculate(unfinished);
+            verify(userPlafondService, never()).calculateAndAssign(any());
+            verify(otpService).generateAndSend(eq("budi@example.com"), eq("REGISTER_VERIFY"));
+        }
+
+        @Test
+        void resumingRegistration_stillRejectsNoHpOwnedByAnotherCustomer() {
+            CustomerRegisterRequest request = validRequest();
+            CustomerEntity unfinished = new CustomerEntity();
+            unfinished.setId(UUID.randomUUID());
+            unfinished.setStatus("PENDING_VERIFICATION");
+            CustomerEntity someoneElse = new CustomerEntity();
+            someoneElse.setId(UUID.randomUUID());
+            when(customerRepository.existsByEmail(request.getEmail())).thenReturn(true);
+            when(customerRepository.findByEmail(request.getEmail())).thenReturn(Optional.of(unfinished));
+            when(customerRepository.existsByNoHp(request.getNoHp())).thenReturn(true);
+            when(customerRepository.findByNoHp(request.getNoHp())).thenReturn(Optional.of(someoneElse));
+
+            assertThatThrownBy(() -> service.register(request))
+                    .isInstanceOf(BusinessRuleException.class)
+                    .hasMessageContaining("Nomor HP sudah terdaftar");
+
+            verify(customerRepository, never()).save(any());
+        }
+
+        @Test
         void rejectsDuplicateNoHp() {
             CustomerRegisterRequest request = validRequest();
             when(customerRepository.existsByEmail(request.getEmail())).thenReturn(false);
@@ -511,6 +576,44 @@ class CustomerAuthServiceTest {
 
             assertThat(result.getNamaLengkap()).isEqualTo("Nama Baru");
             verify(userPlafondService).recalculate(customer);
+        }
+
+        @Test
+        void rejectsFotoKtp_whenLocked() {
+            UUID customerId = UUID.randomUUID();
+            CustomerEntity customer = new CustomerEntity();
+            customer.setId(customerId);
+            customer.setFotoKtp("foto-lama");
+            when(customerRepository.findById(customerId)).thenReturn(Optional.of(customer));
+            when(pengajuanService.getFotoKtpLockReason(customer))
+                    .thenReturn("Foto KTP tidak bisa diganti selama pengajuanmu sedang direview.");
+
+            CustomerUpdateRequest request = new CustomerUpdateRequest();
+            request.setFotoKtp("foto-baru");
+
+            assertThatThrownBy(() -> service.updateOwnProfile(customerId, request))
+                    .isInstanceOf(BusinessRuleException.class)
+                    .hasMessageContaining("direview");
+            assertThat(customer.getFotoKtp()).isEqualTo("foto-lama");
+            verify(customerRepository, never()).save(any());
+        }
+
+        @Test
+        void replacesFotoKtp_whenNotLocked() {
+            UUID customerId = UUID.randomUUID();
+            CustomerEntity customer = new CustomerEntity();
+            customer.setId(customerId);
+            customer.setFotoKtp("foto-lama");
+            when(customerRepository.findById(customerId)).thenReturn(Optional.of(customer));
+            when(customerRepository.save(any(CustomerEntity.class))).thenAnswer(inv -> inv.getArgument(0));
+
+            CustomerUpdateRequest request = new CustomerUpdateRequest();
+            request.setFotoKtp("foto-baru");
+
+            CustomerResponseDTO result = service.updateOwnProfile(customerId, request);
+
+            assertThat(customer.getFotoKtp()).isEqualTo("foto-baru");
+            assertThat(result.isHasFotoKtp()).isTrue();
         }
 
         @Test

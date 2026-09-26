@@ -67,6 +67,12 @@ public class PengajuanService {
                 || isBlank(customer.getNamaPemilikRekening())) {
             throw new BusinessRuleException("Lengkapi data rekening bank di profil Anda sebelum mengajukan pinjaman");
         }
+        // NIK + foto KTP wajib - staff butuh keduanya buat verifikasi identitas di drawer review.
+        // Bisa kosong kalau customer ngelewatin langkah Identitas pas registrasi (auto-login
+        // udah jalan abis OTP), diisi lewat Profil -> KTP & Data Diri.
+        if (isBlank(customer.getNik()) || isBlank(customer.getFotoKtp())) {
+            throw new BusinessRuleException("Lengkapi NIK dan foto KTP di profil Anda sebelum mengajukan pinjaman");
+        }
 
         BungaTenorEntity bungaTenor = bungaTenorRepository.findById(request.getIdBungaTenor())
                 .orElseThrow(() -> new BusinessRuleException("Bunga tenor tidak ditemukan"));
@@ -259,6 +265,26 @@ public class PengajuanService {
         }
         BigDecimal heldNominal = pengajuanRepository.sumHeldNominalByCustomer(customer.getId());
         return effectiveLimit.subtract(heldNominal).max(BigDecimal.ZERO);
+    }
+
+    // ==== Kunci foto KTP ====
+
+    private static final List<String> IN_REVIEW_STATUSES = List.of("MARKETING_REVIEW", "BM_REVIEW", "BACKOFFICE_REVIEW");
+
+    /**
+     * null = customer boleh (ganti) foto KTP. Selain itu alasan kenapa terkunci:
+     * - pernah DISBURSED: permanen - foto itu jadi bukti identitas pas pinjaman disetujui.
+     * - ada pengajuan lagi direview: sementara - biar foto yang dilihat staff gak ganti di tengah proses.
+     * Pengajuan yang ditolak/dibatalkan gak ngunci (customer boleh foto ulang lalu ajukan lagi).
+     */
+    public String getFotoKtpLockReason(CustomerEntity customer) {
+        if (pengajuanRepository.existsByCustomerIdAndStatusIn(customer.getId(), List.of("DISBURSED"))) {
+            return "Foto KTP terkunci karena kamu sudah pernah menerima pencairan dana. Hubungi CS kalau perlu mengganti.";
+        }
+        if (pengajuanRepository.existsByCustomerIdAndStatusIn(customer.getId(), IN_REVIEW_STATUSES)) {
+            return "Foto KTP tidak bisa diganti selama pengajuanmu sedang direview.";
+        }
+        return null;
     }
 
     // ==== Helper internal ====

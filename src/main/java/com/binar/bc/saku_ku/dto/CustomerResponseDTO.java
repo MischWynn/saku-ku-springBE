@@ -35,6 +35,9 @@ public class CustomerResponseDTO {
     private boolean hasFotoKtp;
     private BigDecimal sisaPlafond;
     private String tierPlafond;
+    // null = boleh (ganti) foto KTP; selain itu alasan terkunci, ditampilin apa adanya di Android.
+    // Diisi CustomerAuthService (customer/me), sama pola kayak sisaPlafond/tierPlafond.
+    private String fotoKtpLockReason;
 
     public static CustomerResponseDTO from(CustomerEntity customer) {
         if (customer == null) return null;

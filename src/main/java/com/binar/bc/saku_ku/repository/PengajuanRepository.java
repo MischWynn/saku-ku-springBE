@@ -7,6 +7,7 @@ import org.springframework.data.repository.query.Param;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
 
@@ -37,6 +38,8 @@ public interface PengajuanRepository extends JpaRepository<PengajuanEntity, UUID
     List<Object[]> countPengajuanPerDaySince(@Param("startDate") LocalDateTime startDate);
 
     List<PengajuanEntity> findByCustomerId(UUID customerId);
+
+    boolean existsByCustomerIdAndStatusIn(UUID customerId, Collection<String> statuses);
 
     List<PengajuanEntity> findByStatus(String status);
 }

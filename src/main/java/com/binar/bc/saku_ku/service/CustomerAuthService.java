@@ -53,13 +53,22 @@ public class CustomerAuthService {
     private final PengajuanService pengajuanService;
 
     public CustomerResponseDTO register(CustomerRegisterRequest request) {
+        // Registrasi yang ditinggal sebelum OTP dimasukin (status masih PENDING_VERIFICATION)
+        // dilanjutin, bukan ditolak "Email sudah terdaftar" - kalau ditolak, email itu nyangkut
+        // selamanya (gak bisa daftar ulang, gak bisa login). Aman: akunnya tetap baru aktif
+        // setelah OTP yang dikirim ke email itu diverifikasi.
+        CustomerEntity unfinished = null;
         if (customerRepository.existsByEmail(request.getEmail())) {
-            throw new BusinessRuleException("Email sudah terdaftar");
+            unfinished = customerRepository.findByEmail(request.getEmail())
+                    .filter(CustomerAuthService::isUnfinishedRegistration)
+                    .orElseThrow(() -> new BusinessRuleException("Email sudah terdaftar"));
         }
-        if (customerRepository.existsByNoHp(request.getNoHp())) {
+        if (customerRepository.existsByNoHp(request.getNoHp())
+                && !isSameCustomer(customerRepository.findByNoHp(request.getNoHp()), unfinished)) {
             throw new BusinessRuleException("Nomor HP sudah terdaftar");
         }
-        if (request.getNik() != null && customerRepository.existsByNik(request.getNik())) {
+        if (request.getNik() != null && customerRepository.existsByNik(request.getNik())
+                && !isSameCustomer(customerRepository.findByNik(request.getNik()), unfinished)) {
             throw new BusinessRuleException("NIK sudah terdaftar");
         }
         // Tanggal lahir opsional pas register (Android ngirimnya belakangan lewat PATCH /me),
@@ -68,7 +77,8 @@ public class CustomerAuthService {
             throw new BusinessRuleException("Usia minimal " + AgePolicy.MIN_AGE + " tahun (sesuai syarat kepemilikan KTP)");
         }
 
-        CustomerEntity customer = new CustomerEntity();
+        boolean resuming = unfinished != null;
+        CustomerEntity customer = resuming ? unfinished : new CustomerEntity();
         customer.setNamaLengkap(request.getNamaLengkap());
         customer.setNik(request.getNik());
         customer.setNoHp(request.getNoHp());
@@ -91,7 +101,13 @@ public class CustomerAuthService {
         customer.setNamaPemilikRekening(request.getNamaPemilikRekening());
 
         CustomerEntity saved = customerRepository.save(customer);
-        userPlafondService.calculateAndAssign(saved);
+        if (resuming) {
+            // Baris tbl_user_plafond-nya udah ada dari percobaan pertama - calculateAndAssign()
+            // selalu INSERT, jadi pakai recalculate() (update di tempat) biar gak dobel.
+            userPlafondService.recalculate(saved);
+        } else {
+            userPlafondService.calculateAndAssign(saved);
+        }
         // saveAndFlush (bukan save): INSERT-nya dipaksa jalan SEKARANG, bukan nunggu commit di
         // akhir method. Tanpa flush, pelanggaran constraint DB (mis. kolom NOT NULL) baru
         // ketauan pas commit - SETELAH email OTP udah terlanjur kekirim ke akun yang gak jadi dibuat.
@@ -157,6 +173,11 @@ public class CustomerAuthService {
         }
 
         CustomerEntity customer = existing.get();
+        // Registrasi yang dulu ditinggal sebelum OTP: perlakuin kayak email baru, biar Android
+        // buka form Register lagi (email dikunci) dan register() nerusin akun yang sama.
+        if (isUnfinishedRegistration(customer)) {
+            return GoogleSignInResponseDTO.needsRegistration(email, name);
+        }
         if (customer.getDeletedDate() != null || !"ACTIVE".equals(customer.getStatus())) {
             throw new UnauthorizedException("Akun belum aktif. Cek email Anda untuk kode OTP, atau minta kode baru.");
         }
@@ -165,6 +186,15 @@ public class CustomerAuthService {
                 .orElseThrow(() -> new UnauthorizedException("Akun tidak ditemukan"));
         String token = jwtService.issue(appCustomer.getUsername(), appCustomer.getRole(), Instant.now());
         return GoogleSignInResponseDTO.loggedIn(token, email, customer.getNamaLengkap());
+    }
+
+    private static boolean isUnfinishedRegistration(CustomerEntity customer) {
+        return customer.getDeletedDate() == null && "PENDING_VERIFICATION".equals(customer.getStatus());
+    }
+
+    // true kalau pemilik data yang bentrok (no HP/NIK) ternyata akun yang lagi dilanjutin itu sendiri.
+    private static boolean isSameCustomer(Optional<CustomerEntity> owner, CustomerEntity unfinished) {
+        return unfinished != null && owner.map(c -> c.getId().equals(unfinished.getId())).orElse(false);
     }
 
     public CustomerResponseDTO verifyRegistrationOtp(VerifyOtpRequest request) {
@@ -232,6 +262,7 @@ public class CustomerAuthService {
         CustomerResponseDTO dto = CustomerResponseDTO.from(customer);
         dto.setSisaPlafond(pengajuanService.getSisaPlafond(customer));
         dto.setTierPlafond(userPlafondService.getTierName(customer));
+        dto.setFotoKtpLockReason(pengajuanService.getFotoKtpLockReason(customer));
         return dto;
     }
 
@@ -284,7 +315,13 @@ public class CustomerAuthService {
         if (request.getPendapatanBulanan() != null) {
             userPlafondService.recalculate(customer);
         }
-        if (request.getFotoKtp() != null) customer.setFotoKtp(request.getFotoKtp());
+        if (request.getFotoKtp() != null) {
+            String lockReason = pengajuanService.getFotoKtpLockReason(customer);
+            if (lockReason != null) {
+                throw new BusinessRuleException(lockReason);
+            }
+            customer.setFotoKtp(request.getFotoKtp());
+        }
         if (request.getProvinsi() != null) customer.setProvinsi(request.getProvinsi());
         if (request.getKota() != null) customer.setKota(request.getKota());
         if (request.getKecamatan() != null) customer.setKecamatan(request.getKecamatan());
@@ -296,6 +333,7 @@ public class CustomerAuthService {
         CustomerResponseDTO dto = CustomerResponseDTO.from(saved);
         dto.setSisaPlafond(pengajuanService.getSisaPlafond(saved));
         dto.setTierPlafond(userPlafondService.getTierName(saved));
+        dto.setFotoKtpLockReason(pengajuanService.getFotoKtpLockReason(saved));
         return dto;
     }
 

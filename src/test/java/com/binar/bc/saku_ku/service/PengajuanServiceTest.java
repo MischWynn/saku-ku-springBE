@@ -73,7 +73,40 @@ class PengajuanServiceTest {
         customer.setNamaBank("BCA");
         customer.setNomorRekening("1234567890");
         customer.setNamaPemilikRekening("Novita Sari");
+        // NIK + foto KTP juga wajib buat create().
+        customer.setNik("3273010101990016");
+        customer.setFotoKtp("base64-foto-ktp");
         return customer;
+    }
+
+    @Nested
+    class FotoKtpLock {
+
+        @Test
+        void unlocked_whenNoPengajuanInReviewOrDisbursed() {
+            CustomerEntity customer = customerWithFallbackPlafond(new BigDecimal("10000000"));
+            when(pengajuanRepository.existsByCustomerIdAndStatusIn(eq(customer.getId()), any())).thenReturn(false);
+
+            assertThat(service.getFotoKtpLockReason(customer)).isNull();
+        }
+
+        @Test
+        void lockedPermanently_whenEverDisbursed() {
+            CustomerEntity customer = customerWithFallbackPlafond(new BigDecimal("10000000"));
+            when(pengajuanRepository.existsByCustomerIdAndStatusIn(customer.getId(), List.of("DISBURSED"))).thenReturn(true);
+
+            assertThat(service.getFotoKtpLockReason(customer)).contains("pencairan");
+        }
+
+        @Test
+        void lockedTemporarily_whenPengajuanInReview() {
+            CustomerEntity customer = customerWithFallbackPlafond(new BigDecimal("10000000"));
+            when(pengajuanRepository.existsByCustomerIdAndStatusIn(customer.getId(), List.of("DISBURSED"))).thenReturn(false);
+            when(pengajuanRepository.existsByCustomerIdAndStatusIn(
+                    customer.getId(), List.of("MARKETING_REVIEW", "BM_REVIEW", "BACKOFFICE_REVIEW"))).thenReturn(true);
+
+            assertThat(service.getFotoKtpLockReason(customer)).contains("direview");
+        }
     }
 
     @Nested
@@ -184,6 +217,32 @@ class PengajuanServiceTest {
                     .hasMessageContaining("Lengkapi data pekerjaan dan pendapatan bulanan");
 
             verify(bungaTenorRepository, never()).findById(any());
+        }
+
+        @Test
+        void throwsBusinessRuleException_whenFotoKtpMissing() {
+            CustomerEntity customer = customerWithFallbackPlafond(new BigDecimal("10000000"));
+            customer.setId(customerId);
+            customer.setFotoKtp(null);
+            when(customerRepository.findById(customerId)).thenReturn(Optional.of(customer));
+
+            assertThatThrownBy(() -> service.create(customerId, request("1000000")))
+                    .isInstanceOf(BusinessRuleException.class)
+                    .hasMessageContaining("Lengkapi NIK dan foto KTP");
+
+            verify(bungaTenorRepository, never()).findById(any());
+        }
+
+        @Test
+        void throwsBusinessRuleException_whenNikMissing() {
+            CustomerEntity customer = customerWithFallbackPlafond(new BigDecimal("10000000"));
+            customer.setId(customerId);
+            customer.setNik(null);
+            when(customerRepository.findById(customerId)).thenReturn(Optional.of(customer));
+
+            assertThatThrownBy(() -> service.create(customerId, request("1000000")))
+                    .isInstanceOf(BusinessRuleException.class)
+                    .hasMessageContaining("Lengkapi NIK dan foto KTP");
         }
 
         @Test
